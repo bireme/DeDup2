@@ -90,7 +90,7 @@ class AuthorsComparator(fieldName: String) extends Comparator {
     val cond3 = getSimilarity(author1, author2) >= SYM1
     val cond4 = cond2 && cond3
     val cond5 = getSimilarity(author1, author2) >= SYM2
-    val cond6 = cond1 && (cond4 || cond5)
+    //val cond6 = cond1 && (cond4 || cond5)
     println(s"sim=$s1 au1=$author1 au2=$author2")
 
     (author1.isEmpty && author2.isEmpty) ||
