@@ -18,7 +18,7 @@ class CSVProducer(csvFile: String,
       val formatBuilder: CSVFormat.Builder = CSVFormat.Builder.create().setDelimiter(fieldSeparator).setTrim(true)
         .setSkipHeaderRecord(hasHeader)
       val reader: InputStreamReader = Source.fromFile(csvFile, csvFileEncoding).reader()
-      val parser: CSVParser = new CSVParser(reader, formatBuilder.build())
+      val parser: CSVParser = CSVParser.builder().setFormat(formatBuilder.get()).setReader(reader).get()
 
       getDocumentsLazy(parser, schema, parser.iterator().asScala)
     } match {

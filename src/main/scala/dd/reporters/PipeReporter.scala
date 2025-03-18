@@ -14,7 +14,7 @@ class PipeReporter(writer: Writer,
   private val fieldSeparator: String = "|"
   private val formatBuilder: CSVFormat.Builder = CSVFormat.Builder.create().setRecordSeparator(recordSeparator).setTrim(true)
     .setDelimiter(fieldSeparator).setAutoFlush(true)
-  private val format: CSVFormat = formatBuilder.build()
+  private val format: CSVFormat = formatBuilder.get()
   private var first: Boolean = true
 
   override def writeResults(originalDoc: Document,
