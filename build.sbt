@@ -2,11 +2,11 @@ name := "DeDup2"
 
 version := "0.1"
 
-scalaVersion := "2.13.15"  // "3.5.2" not possible because stringdistance
+scalaVersion := "2.13.16"  // "3.5.2" not possible because stringdistance
 
-val luceneVersion = "10.0.0" //"9.7.0" //"9.5.0" //"9.4.2"
+val luceneVersion = "10.1.0" //"9.7.0" //"9.5.0" //"9.4.2"
 val stringDistanceVersion = "1.2.7"
-val commonsCVSVersion = "1.12.0" //"1.9.0"
+val commonsCVSVersion = "1.13.0" //"1.9.0"
 val playJsonVersion = "2.10.6" //"2.10.0-RC6"
 
 libraryDependencies ++= Seq(
