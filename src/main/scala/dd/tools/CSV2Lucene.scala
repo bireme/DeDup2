@@ -13,7 +13,7 @@ object CSV2Lucene extends App {
     System.err.println("options:")
     System.err.println("\t-csvFile=<path> Path to the comma separated value file (csv)")
     System.err.println("\t-index=<path> Path to the index to be created")
-    System.err.println("\t-schema=(<pos=<pos>:<fieldName>,...,<pos>:<fieldName>|file=<path>) Associate the csv field position (start with 0)")
+    System.err.println("\t-schema=(<pos=<pos>=fieldName>,...,<pos>=<fieldName>|file=<path>) Associate the csv field position (start with 0)")
     System.err.println("\t\twith the Lucene document field name. If the parameter starts with file= then the corresponding schema file path will be used.")
     System.err.println("\t-fieldToIndex=<name> Name of the field to be indexed")
     System.err.println("\t[-fieldSeparator=<char>] Character indication the field separator. Default value is ','.")
