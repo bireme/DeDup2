@@ -3,7 +3,6 @@ package dd
 import org.apache.lucene.analysis.Tokenizer
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute
 
-import java.text.Normalizer
 import scala.annotation.tailrec
 
 class NGTokenizer(ngramSize: Int) extends Tokenizer {

@@ -1,7 +1,7 @@
 package dd.producers
 
 import dd.interfaces.{DocsProducer, Document}
-import org.apache.commons.csv.{CSVFormat, CSVParser, CSVRecord, QuoteMode}
+import org.apache.commons.csv.{CSVFormat, CSVParser, CSVRecord}
 
 import java.io.InputStreamReader
 import scala.io.Source
@@ -23,7 +23,7 @@ class CSVProducer(csvFile: String,
       getDocumentsLazy(parser, schema, parser.iterator().asScala)
     } match {
       case Success(list) => list
-      case Failure(exception: Exception) =>
+      case Failure(exception: Throwable) =>
         exception.printStackTrace()
         LazyList.empty[Document]
     }
