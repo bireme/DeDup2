@@ -6,6 +6,6 @@ PATH="$JAVA_HOME/bin:$PATH"
 cd /home/javaapps/sbt-projects/DeDup2 || exit
 
 # shellcheck disable=SC2016
-sbt 'runMain dd.tools.CSV2Lucene $1 $2 $3 $4 $5 $6 $7'
+sbt "runMain dd.tools.CSV2Lucene $1 $2 $3 $4 $5 $6 $7"
 
 cd - || exit
