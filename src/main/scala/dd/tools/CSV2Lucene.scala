@@ -30,6 +30,10 @@ object CSV2Lucene extends App {
       else map + ((split(0).substring(1), split(1)))
   }
 
+  println("PArameters:")
+  parameters.foreach(param => println(s"\t${param._1}=${param._2}"))
+  println()
+
   if (!Set("csvFile", "index", "schema", "fieldToIndex").forall(parameters.contains)) usage()
 
   private val csvFile: String = parameters("csvFile")
@@ -53,10 +57,10 @@ object CSV2Lucene extends App {
 
   private val producer: DocsProducer = new CSVProducer(csvFile, schemaMap, hasHeader, fieldSeparator, encoding)
 
-  System.out.print("Indexing ...")
+  System.out.println("Indexing ...")
 
   Tools.createLuceneIndex(producer, indexPath, fieldToIndex, new NGAnalyzer()) match {
-    case Success(_) => System.out.println("OK!")
+    case Success(_) => System.out.println("Indexing finished successfully!")
     case Failure(exception) => exception.printStackTrace()
   }
 }
