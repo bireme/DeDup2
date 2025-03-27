@@ -1,7 +1,7 @@
 package dd.producers
 
 import dd.interfaces.{DocsProducer, Document}
-import org.apache.commons.csv.{CSVFormat, CSVParser, CSVRecord}
+import org.apache.commons.csv.{CSVFormat, CSVParser, CSVRecord, QuoteMode}
 
 import java.io.InputStreamReader
 import scala.io.Source
@@ -16,14 +16,16 @@ class CSVProducer(csvFile: String,
   override def getDocuments: LazyList[Document] = {
     Try {
       val formatBuilder: CSVFormat.Builder = CSVFormat.Builder.create().setDelimiter(fieldSeparator).setTrim(true)
-        .setSkipHeaderRecord(hasHeader)
+        .setSkipHeaderRecord(hasHeader).setIgnoreEmptyLines(true).setQuote(null)
       val reader: InputStreamReader = Source.fromFile(csvFile, csvFileEncoding).reader()
       val parser: CSVParser = CSVParser.builder().setFormat(formatBuilder.get()).setReader(reader).get()
 
       getDocumentsLazy(parser, schema, parser.iterator().asScala)
     } match {
       case Success(list) => list
-      case Failure(_) => LazyList.empty[Document]
+      case Failure(exception: Exception) =>
+        exception.printStackTrace()
+        LazyList.empty[Document]
     }
   }
 
@@ -33,10 +35,12 @@ class CSVProducer(csvFile: String,
     if (iterator.hasNext) {
       Try {
         val record: CSVRecord = iterator.next()
-        //val size = record.size()
+        val recSize: Int = record.size()
+
         val fields: Seq[(String, String)] = schema.foldLeft(Seq[(String,String)]()) {
           case (flds, (pos, fld)) =>
             //println(s"fld=$fld pos=$pos content=${record.get(pos)}")
+            assert(pos < recSize, s"Invalid position. Record size=$recSize Position=$pos. Please, compare the schema position field with cvs number of fields.")
             flds :+ (fld, record.get(pos))
         }
         Document(fields)

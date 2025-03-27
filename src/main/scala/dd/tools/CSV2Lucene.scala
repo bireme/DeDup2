@@ -49,6 +49,8 @@ object CSV2Lucene extends App {
   } else schema
   private val schemaMap: Map[Int, String] = schemaContent.split("\\s*(,|\r?\n\r?)\\s*").map(_.split(" *= *", 2))
     .map(elem => (elem(0).toInt, elem(1))).toMap
+  assert(schemaMap.values.exists(_.equals(fieldToIndex)), s"Field to index [$fieldToIndex] is not present in the schema file.")
+
   private val producer: DocsProducer = new CSVProducer(csvFile, schemaMap, hasHeader, fieldSeparator, encoding)
 
   System.out.print("Indexing ...")
