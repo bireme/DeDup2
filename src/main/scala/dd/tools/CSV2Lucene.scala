@@ -30,7 +30,7 @@ object CSV2Lucene extends App {
       else map + ((split(0).substring(1), split(1)))
   }
 
-  println("PArameters:")
+  println("Parameters:")
   parameters.foreach(param => println(s"\t${param._1}=${param._2}"))
   println()
 

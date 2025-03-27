@@ -27,9 +27,13 @@ object Tools {
       val directory: Directory = FSDirectory.open(iPath)
       val config: IndexWriterConfig = new IndexWriterConfig(analyzer).setOpenMode(IndexWriterConfig.OpenMode.CREATE)
       val iwriter: IndexWriter = new IndexWriter(directory, config)
+      var tell: Int = 0
 
       producer.getDocuments.foreach {
         dc =>
+          if (tell % 1000 == 0) println(s"+++$tell")
+          tell += 1
+
           val lucDoc: document.Document = dc.fields.foldLeft(new org.apache.lucene.document.Document()) {
             case (ldoc, (fldName, fldValue)) =>
               if (fldName.equals(fieldToIndex)) {
