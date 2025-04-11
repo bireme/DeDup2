@@ -32,9 +32,9 @@ class SimilarDocs(finder: DocsFinder,
   }
 
   private def similar(originalDoc: Document): Try[LazyList[(Document, Seq[CompResult])]] = {
-    val query = finder.getSearchField match {
+    val query: String = finder.getSearchField match {
       case Some(srcField) =>
-        originalDoc.fields.filter(_._1.equals(srcField)).map(_._2).headOption match {
+        originalDoc.fields.find(_._1.equals(srcField)).map(_._2) match {
           case Some(qry) => qry
           case None => throw new Exception("Empty search field")
         }

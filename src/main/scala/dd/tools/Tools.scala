@@ -6,13 +6,14 @@ import org.apache.lucene.document
 import org.apache.lucene.document.{Field, StoredField, TextField}
 import org.apache.lucene.index.{IndexWriter, IndexWriterConfig}
 import org.apache.lucene.store.{Directory, FSDirectory}
+import play.api.libs.json.{JsArray, JsObject, JsString, JsValue, Json}
 
 import java.io.File
 import java.nio.file.Path
 import java.text.Normalizer
 import java.text.Normalizer.Form
 import scala.jdk.CollectionConverters.IteratorHasAsScala
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 object Tools {
   def normalizeStr(in: String): String = Normalizer.normalize(in.trim().toLowerCase, Form.NFD)
@@ -31,7 +32,7 @@ object Tools {
 
       producer.getDocuments.foreach {
         dc =>
-          if (tell % 1000 == 0) println(s"+++$tell")
+          if (tell % 100_000 == 0) println(s"+++$tell")
           tell += 1
 
           val lucDoc: document.Document = dc.fields.foldLeft(new org.apache.lucene.document.Document()) {
@@ -55,5 +56,34 @@ object Tools {
       case (seq, field) => seq :+ (field.name() -> field.stringValue())
     }
     Document(fields)
+  }
+
+  def doc2json(doc: Document,
+               allFldsAreArray: Boolean = false): JsValue = {
+    val map1: Map[String, Seq[JsValue]] = doc.fields.foldLeft(Map[String, Seq[JsValue]]()) {
+      case (mp, (k,v)) =>
+        val vT: String = v.trim
+        val field: JsValue = if (vT.startsWith("[") || vT.startsWith("{")) {
+          Try(Json.parse(vT)) match {
+            case Success(json) => json
+            case Failure(_) => JsString(vT)
+          }
+        } else JsString(vT)
+        mp + (k -> mp.getOrElse(k, Seq[JsValue]()).appended(field))
+    }
+    val map2: Map[String, JsArray] = map1.map {
+      case (k, seq) => k -> JsArray(seq)
+    }
+    val seq1: Seq[(String, JsArray)] = map2.toSeq
+    val seq2: Seq[(String, JsValue)] = if (allFldsAreArray) seq1
+    else {
+      seq1.map {
+        case (k, seq) => if (seq.value.length == 1) k -> seq.value.head
+        else k -> seq
+      }
+    }
+    val json: JsValue = JsObject(seq2)
+
+    json
   }
 }
