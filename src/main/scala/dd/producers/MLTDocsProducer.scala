@@ -13,11 +13,17 @@ import java.io.StringReader
 import java.nio.file.Paths
 import scala.util.{Failure, Success, Try}
 
+/**
+ * Lucene producer that retrieves documents through a MoreLikeThis query.
+ *
+ * The producer builds a Lucene `MoreLikeThis` query from the provided content,
+ * loads matching hits page by page, and lazily exposes only the documents that
+ * satisfy the optional secondary similarity threshold.
+ */
 class MLTDocsProducer(indexPath: String,
                       fieldName: String,
                       matchContent: String,
-                      minSimilarity: Option[Float]) extends DocsProducer {
-//Try {
+                      minSimilarity: Option[Float]) extends DocsProducer:
   private val directory: FSDirectory = FSDirectory.open(Paths.get(indexPath))
   private val reader: DirectoryReader = DirectoryReader.open(directory)
   private val searcher: IndexSearcher = new IndexSearcher(reader)
@@ -29,79 +35,102 @@ class MLTDocsProducer(indexPath: String,
 
   private val query: Query = mlt.like(fieldName, new StringReader(matchContent))
 
-  def getDocuments: LazyList[Document] = getDocumentsLazy(None, curPos = 0, query, searcher)
+  /**
+   * Returns the produced documents.
+   * @return lazy list of produced documents
+   */
+  override def getDocuments: LazyList[Document] = getDocumentsLazy(None, curPos = 0, query, searcher)
 
+  /**
+   * Returns the next document identifier from the current result page.
+   *
+   * @param scoreDocs current page of Lucene score documents
+   * @param curPos current position inside the loaded score documents
+   * @param query main query string used to search for documents
+   * @param searcher Lucene searcher used to retrieve documents
+   * @return next valid document identifier when available
+   */
   private def getDocumentId(scoreDocs: Option[Array[ScoreDoc]],
                             curPos: Int,
                             query: Query,
-                            searcher: IndexSearcher): Either[Throwable, (Array[ScoreDoc],Int)] = {
-    scoreDocs match {
-      case Some(arr) =>
-        if (arr.isEmpty) Right(Array[ScoreDoc](), curPos)
-        else if (curPos >= arr.length) {
-          loadHits(Some(arr.last), query, searcher) flatMap {
+                            searcher: IndexSearcher): Either[Throwable, (Array[ScoreDoc],Int)] =
+    scoreDocs.fold(loadHits(None, query, searcher).flatMap(arr => getDocumentId(Some(arr), curPos = 0, query, searcher))):
+      arr =>
+        if arr.isEmpty then Right(Array.empty[ScoreDoc], curPos)
+        else if curPos >= arr.length then
+          loadHits(Some(arr.last), query, searcher).flatMap:
             arr2 => getDocumentId(Some(arr2), curPos = 0, query, searcher)
-          }
-        } else Right((scoreDocs.get, curPos))
-      case None =>
-        loadHits(None, query, searcher) flatMap {
-          arr2 => getDocumentId(Some(arr2), curPos = 0, query, searcher)
-        }
-      }
-  }
+        else Right((arr, curPos))
 
+  /**
+   * Loads a page of Lucene hits.
+   *
+   * @param after last score document from the previous page
+   * @param query main query string used to search for documents
+   * @param searcher Lucene searcher used to retrieve documents
+   * @return loaded page of score documents
+   */
   private def loadHits(after: Option[ScoreDoc],
                        query: Query,
-                       searcher: IndexSearcher): Either[Throwable, Array[ScoreDoc]] = {
+                       searcher: IndexSearcher): Either[Throwable, Array[ScoreDoc]] =
     val maxHits = 500
 
-    Try {
-      val topDocs: TopDocs = after match {
+    Try:
+      val topDocs: TopDocs = after match
         case Some(aft) => searcher.searchAfter(aft, query, maxHits)
         case None => searcher.search(query, maxHits)
-      }
       topDocs.scoreDocs
-    }.toEither
-  }
+    .toEither
 
+  /**
+   * Builds the lazy list of produced documents.
+   *
+   * @param after last score document from the previous page
+   * @param curPos current position inside the loaded score documents
+   * @param query main query string used to search for documents
+   * @param searcher Lucene searcher used to retrieve documents
+   * @return lazy list of produced documents
+   */
   private def getDocumentsLazy(after: Option[Array[ScoreDoc]],
                                curPos: Int,
                                query: Query,
-                               searcher: IndexSearcher): LazyList[Document] = {
-    getDocumentId(after, curPos, query, searcher) match {
+                               searcher: IndexSearcher): LazyList[Document] =
+    getDocumentId(after, curPos, query, searcher) match
       case Right((arr, cPos)) =>
-        if (arr.isEmpty) LazyList.empty[Document]
-        else {
-          Try(searcher.storedFields().document(arr(cPos).doc)) match {
+        if arr.isEmpty then LazyList.empty[Document]
+        else
+          Try(searcher.storedFields().document(arr(cPos).doc)) match
             case Success(ldoc) =>
-              if (isSimilar(matchContent, ldoc, fieldName, minSimilarity.getOrElse(0))) {
-                Try(Tools.doc2doc(ldoc)) match {
+              if isSimilar(matchContent, ldoc, fieldName, minSimilarity.getOrElse(0)) then
+                Try(Tools.doc2doc(ldoc)) match
                   case Success(doc) => doc #:: getDocumentsLazy(Some(arr), cPos + 1, query, searcher)
                   case Failure(exception) =>
                     Console.println(s"MLTDocsProducer/getDocumentsLazy/${exception.getMessage}")
                     getDocumentsLazy(Some(arr), cPos + 1, query, searcher)
-                }
-              } else getDocumentsLazy(Some(arr), cPos + 1, query, searcher)
+              else getDocumentsLazy(Some(arr), cPos + 1, query, searcher)
             case Failure(exception) =>
               Console.println(s"MLTDocsProducer/getDocumentsLazy/${exception.getMessage}")
               getDocumentsLazy(Some(arr), cPos + 1, query, searcher)
-          }
-        }
       case Left(exception) =>
         Console.println(s"MLTDocsProducer/getDocumentsLazy/${exception.getMessage}")
         LazyList.empty[Document]
-    }
-  }
 
+  /**
+   * Checks whether the provided values should be considered similar.
+   *
+   * @param originalContent reference content used to filter the matched documents
+   * @param lucDocument Lucene document currently being inspected
+   * @param fieldName field name associated with the operation
+   * @param minSimilarity minimum similarity threshold accepted as a match
+   * @return true when the provided values are considered similar, false otherwise
+   */
   private def isSimilar(originalContent: String,
                         lucDocument: org.apache.lucene.document.Document,
                         fieldName: String,
-                        minSimilarity: Float): Boolean = {
+                        minSimilarity: Float): Boolean =
     val distance: LevenshteinDistance = new LevenshteinDistance()
 
     val maxDistance: Float = lucDocument.getFields(fieldName)
       .map(fld => distance.getDistance(fld.stringValue(), originalContent)).max
 
     maxDistance >= minSimilarity
-  }
-}
