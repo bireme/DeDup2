@@ -2,47 +2,55 @@ package dd.producers
 
 import dd.interfaces.{DocsProducer, Document}
 
-import java.nio.charset.{Charset, CharsetDecoder, CodingErrorAction}
+import java.nio.charset.{CharsetDecoder, CodingErrorAction}
 import java.sql.{Connection, DriverManager, ResultSet, ResultSetMetaData, Statement}
 import play.api.libs.json.{JsArray, JsObject, JsString, JsValue, Json}
 
 import scala.io.{BufferedSource, Codec, Source}
 import scala.util.{Failure, Success, Try}
 
+/**
+ * Immutable configuration used by the MySQL-backed document producer.
+ *
+ * The configuration groups connection details, SQL source settings, and the
+ * optional mappings needed to expand JSON and repetitive fields into the
+ * internal document representation produced by the pipeline.
+ */
 case class MySqlProducerConfig(mySqlHost: String,
                                mySqlPort: Int,
                                mySqlDbname: String,
                                mySqlUser: String,
                                mySqlPassword: String,
-                               sqlf: String,                    // file having the sql statement
-                               sqlEncoding: String,             // the sql file character encoding
-                               jsonFields: Option[Map[String, Map[String, String]]],  // map a sql table field name (with json content) with a collection of json field path to extract and it's new field name.
-                               repetitiveFields: Option[Set[String]],              // the name of the fields that should be broken into a new line when the repetitive the separator symbol is defined.
-                               repetitiveSep: Option[String]) { // string used to split repetitive fields
+                               sqlf: String,
+                               sqlEncoding: String,
+                               jsonFields: Option[Map[String, Map[String, String]]],
+                               repetitiveFields: Option[Set[String]],
+                               repetitiveSep: Option[String]):
   require(mySqlHost.trim.nonEmpty)
   require(mySqlPort > 0)
   require(mySqlDbname.trim.nonEmpty)
   require(sqlf.trim.nonEmpty)
   require(sqlEncoding.trim.nonEmpty)
   require(repetitiveFields.isEmpty || repetitiveSep.isDefined)
-}
+
 /**
- * A producer of documents coming from a MySQL database
- * @param conf class with the parameters used by this class
+ * Database-backed document producer that streams rows from MySQL.
+ *
+ * The producer executes the configured SQL query, converts each result row into
+ * one or more internal documents, and expands JSON or repetitive fields when
+ * the corresponding configuration options are present.
  */
-class MysqlProducer(conf: MySqlProducerConfig) extends DocsProducer {
+class MysqlProducer(conf: MySqlProducerConfig) extends DocsProducer:
   private val con: Connection = DriverManager.getConnection(
-    //s"jdbc:mysql://${host.trim}:3306/${dbnm.trim}",
     s"jdbc:mysql://${conf.mySqlHost.trim}:${conf.mySqlPort}/${conf.mySqlDbname.trim}?useTimezone=true&serverTimezone=UTC&useSSL=false",
     conf.mySqlUser, conf.mySqlPassword)
   private val statement: Statement = con.createStatement()
-  private val codec: Codec = conf.sqlEncoding.toLowerCase match {
+  private val codec: Codec = conf.sqlEncoding.toLowerCase match
     case "iso8859-1" => scala.io.Codec.ISO8859
     case _           => scala.io.Codec.UTF8
-  }
   private val codAction: CodingErrorAction = CodingErrorAction.REPLACE
   private val decoder: CharsetDecoder = codec.decoder.onMalformedInput(codAction)
-  private val reader: BufferedSource = Source.fromFile(conf.sqlf)(decoder)
+  private val reader: BufferedSource = Source.fromFile(conf.sqlf)(using Codec(decoder))
   private val content: String = reader.getLines().mkString(" ")
 
   print("Executing query ... ")
@@ -51,142 +59,166 @@ class MysqlProducer(conf: MySqlProducerConfig) extends DocsProducer {
 
   reader.close()
 
+  /**
+   * Returns the produced documents.
+   * @return lazy list of produced documents
+   */
   override def getDocuments: LazyList[Document] = getDocuments(Seq())
 
-  def getDocuments(previous: Seq[Document]): LazyList[Document] = {
-    previous.headOption match {
-      case Some(prev) => prev #:: getDocuments(previous.tail)
-      case None =>
-        if (rs.next()) {
-          parseRecord(rs, conf.jsonFields, conf.repetitiveFields, conf.repetitiveSep) match {
-            case Success(docs) =>
-              docs.headOption match {
-                case Some(doc) => doc #:: getDocuments(docs.tail)
-                case None => getDocuments(Seq())
-              }
+  /**
+   * Returns the produced documents.
+   *
+   * @param previous documents prepared in earlier recursive calls
+   * @return lazy list of produced documents
+   */
+  def getDocuments(previous: Seq[Document]): LazyList[Document] =
+    previous match
+      case head +: tail => head #:: getDocuments(tail)
+      case _ =>
+        if rs.next() then
+          parseRecord(rs, conf.jsonFields, conf.repetitiveFields, conf.repetitiveSep) match
+            case Success(doc +: tail) => doc #:: getDocuments(tail)
+            case Success(_) => getDocuments(Seq.empty)
             case Failure(exception) =>
-              exception.printStackTrace()
+              Console.err.println(s"MysqlProducer/getDocuments/${exception.getMessage}")
               con.close()
               LazyList.empty
-          }
-        } else {
+        else
           con.close()
           LazyList.empty
-        }
-    }
-  }
 
-  /** Given a record retrieved by a query, returns a list of the contents of the
-   * desired fields.
+  /**
+   * Parses the current database record into internal documents.
    *
-   * @param rs result set object whose current position points to the retrieved record
-   * @param jsonFields name of the sql column -> (json path -> new field name)
-   * @param repetitiveSep the string used to split a field content into more than one occurrence
-   *
-   * @return a sequence of Document objects
+   * @param rs result set positioned at the current database row
+   * @param jsonFields mapping that describes how JSON fields should be extracted
+   * @param repetitiveFields field names that may produce repeated values
+   * @param repetitiveSep value of repetitive sep
+   * @return documents parsed from the current database row
    */
   private def parseRecord(rs: ResultSet,
                           jsonFields: Option[Map[String, Map[String, String]]],
                           repetitiveFields: Option[Set[String]],
-                          repetitiveSep: Option[String]): Try[Seq[Document]] = {
-    Try {
+                          repetitiveSep: Option[String]): Try[Seq[Document]] =
+    for
+      fieldMap <- fieldNames(rs).flatMap:
+        _.foldLeft(Try(Map.empty[String, Seq[String]])):
+          case (acc, (column, fieldName)) =>
+            for
+              current <- acc
+              values <- extractFieldValues(rs, column, fieldName, jsonFields, repetitiveFields, repetitiveSep)
+            yield current ++ values
+    yield genDocSeq(fieldMap)
+
+  /**
+   * Resolves the database column names for the current result set.
+   *
+   * @param rs result set positioned at the current database row
+   * @return result containing the indexed column names
+   */
+  private def fieldNames(rs: ResultSet): Try[Seq[(Int, String)]] =
+    Try:
       val meta: ResultSetMetaData = rs.getMetaData
-      val cols: Int = meta.getColumnCount
-      val names: Map[Int, String] = (1 to cols).foldLeft(Map[Int, String]()) {
-        case (map, col) => map + (col -> meta.getColumnName(col))
-      }
-      val auxMap: Map[String, Seq[String]] = (1 to cols).foldLeft[Map[String, Seq[String]]](Map()) {
-        case (map, col) =>
-          val fName: String = names(col)
+      (1 to meta.getColumnCount).map(column => column -> meta.getColumnName(column))
 
-          Option(rs.getString(col)) match {
-            case Some(fContent) =>
-              val fContentT: String = fContent.trim
+  /**
+   * Extracts the values associated with the current database column.
+   *
+   * @param rs result set positioned at the current database row
+   * @param column database column index
+   * @param fieldName logical field name associated with the column
+   * @param jsonFields mapping used to expand JSON fields
+   * @param repetitiveFields field names configured as repetitive
+   * @param repetitiveSep separator used to split repetitive fields
+   * @return result containing the normalized field map for the column
+   */
+  private def extractFieldValues(rs: ResultSet,
+                                 column: Int,
+                                 fieldName: String,
+                                 jsonFields: Option[Map[String, Map[String, String]]],
+                                 repetitiveFields: Option[Set[String]],
+                                 repetitiveSep: Option[String]): Try[Map[String, Seq[String]]] =
+    Option(rs.getString(column)).map(_.trim)
+      .map:
+        content =>
+          jsonFields.flatMap(_.get(fieldName))
+            .map(getJsonSeq(content, fieldName, _))
+            .getOrElse(Success(Map(fieldName -> splitRepetitive(fieldName, content, repetitiveFields, repetitiveSep))))
+      .getOrElse(Success(Map(fieldName -> Seq.empty)))
 
-              jsonFields match {
-                case Some(jFields) => jFields.get(fName) match {
-                  case Some(map1: Map[String, String]) => getJsonSeq(fContentT, fName, map1) match {
-                    case Success(map2) => map ++ map2
-                    case Failure(exception) => throw exception
-                  }
-                  case None => repetitiveFields match {
-                    case Some(rFields) if rFields.nonEmpty && rFields.contains(fName) => map + (fName -> fContentT.split(repetitiveSep.get).toSeq)
-                    case _ => map + (fName -> Seq(fContentT))
-                  }
-                }
-                case None => repetitiveFields match {
-                  case Some(rFields) if rFields.nonEmpty && rFields.contains(fName) => map + (fName -> fContentT.split(repetitiveSep.get).toSeq)
-                  case _ => map + (fName -> Seq(fContentT))
-                }
-              }
-            case None => map + (fName -> Seq[String]())
-          }
-      }
-      auxMap
-    }.map(map => genDocSeq(map))
-  }
+  /**
+   * Splits repetitive field content when configured for the selected field.
+   *
+   * @param fieldName logical field name associated with the current value
+   * @param content raw column content to normalize
+   * @param repetitiveFields field names configured as repetitive
+   * @param repetitiveSep separator used to split repetitive fields
+   * @return normalized sequence of field values
+   */
+  private def splitRepetitive(fieldName: String,
+                              content: String,
+                              repetitiveFields: Option[Set[String]],
+                              repetitiveSep: Option[String]): Seq[String] =
+    repetitiveFields match
+      case Some(fields) if fields.contains(fieldName) => content.split(repetitiveSep.get).toSeq
+      case _ => Seq(content)
 
+  /**
+   * Extracts the configured JSON values from the current field.
+   *
+   * @param jsonStr raw JSON content to parse
+   * @param jsonFieldName name assigned to the extracted JSON field
+   * @param jsonFields mapping that describes how JSON fields should be extracted
+   * @return mapped JSON values extracted from the field
+   */
   private def getJsonSeq(jsonStr: String,
                          jsonFieldName: String,
-                         jsonFields: Map[String, String]): Try[Map[String, Seq[String]]] = {
-    Try {
+                         jsonFields: Map[String, String]): Try[Map[String, Seq[String]]]=
+    Try:
       require(jsonStr.trim.nonEmpty)
 
-      jsonStr.trim match {
+      jsonStr.trim match
         case "" => Map(jsonFieldName -> Seq(""))
         case jstr =>
-          Json.parse(jstr) match {
+          Json.parse(jstr) match
             case arr: JsArray =>
               val seq: Seq[JsValue] = arr.value.toSeq
-              seq.headOption match {
+              seq.headOption match
                 case Some(obj: JsObject) =>
-                  jsonFields.foldLeft(Map[String, Seq[String]]()) {
-                    case (map, (path, newName)) =>
-                      (obj \ path).asOpt[String] match {
-                        case Some(fld) =>
-                          val fields: Seq[String] = map.getOrElse(newName, Seq[String]()).appended(fld)
-                          map + (newName -> fields)
-                        case None => map
-                      }
-                  }
+                  extractJsonObjectFields(obj, jsonFields)
                 case Some(_) => Map(jsonFieldName -> seq.map(_.toString()))
                 case None => Map(jsonFieldName -> Seq(""))
-              }
             case obj: JsObject =>
-              jsonFields.foldLeft(Map[String, Seq[String]]()) {
-                case (map, (path, newName)) =>
-                  (obj \ path).asOpt[String] match {
-                    case Some(fld) =>
-                      val fields: Seq[String] = map.getOrElse(newName, Seq[String]()).appended(fld)
-                      map + (newName -> fields)
-                    case None => map
-                  }
-              }
+              extractJsonObjectFields(obj, jsonFields)
             case str: JsString => Map(jsonFieldName -> Seq(str.toString()))
             case other => throw new IllegalArgumentException(other.toString())
-          }
-      }
-    }
-  }
 
-  private def genDocSeq(map: Map[String, Seq[String]]): Seq[Document] = {
-    map.headOption match {
-      case Some((key, seq)) =>
-        val previous: Seq[Document] = genDocSeq(map.tail)
+  /**
+   * Extracts configured JSON paths from the given JSON object.
+   *
+   * @param obj parsed JSON object used as the extraction source
+   * @param jsonFields mapping between JSON paths and output field names
+   * @return grouped field values extracted from the JSON object
+   */
+  private def extractJsonObjectFields(obj: JsObject,
+                                      jsonFields: Map[String, String]): Map[String, Seq[String]] =
+    jsonFields.toSeq.flatMap:
+      case (path, newName) => (obj \ path).asOpt[String].map(newName -> _)
+    .groupMap(_._1)(_._2)
 
-        if (previous.isEmpty) seq.map(content => Document(Seq(key -> content)))
-        else seq.flatMap(content => previous.map(doc => Document(doc.fields.appended(key -> content))))
-      case None => Seq[Document]()
-    }
-  }
-
-  private def isUtf8Encoding(text: String): Boolean = {
-    require(text != null)
-
-    val utf8: Charset = Charset.availableCharsets().get("UTF-8")
-    val b1: Array[Byte] = text.getBytes(utf8)
-    val b2: Array[Byte] = new String(b1, utf8).getBytes(utf8)
-
-    b1.sameElements(b2)
-  }
-}
+  /**
+   * Generates the document sequence represented by the field map.
+   *
+   * @param map field map used to generate documents
+   * @return generated document sequence
+   */
+  private def genDocSeq(map: Map[String, Seq[String]]): Seq[Document] =
+    map.toSeq.foldRight(Seq(Document(Seq.empty))):
+      case ((field, values), documents) =>
+        val currentValues = values match
+          case Seq() => Seq("")
+          case nonEmpty => nonEmpty
+        for
+          value <- currentValues
+          document <- documents
+        yield Document(document.fields.appended(field -> value))
