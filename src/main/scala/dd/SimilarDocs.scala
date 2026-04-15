@@ -5,7 +5,8 @@ import dd.interfaces.{CompResult, Comparator, DocsFinder, Document, Reporter}
 import dd.producers.CSVProducer
 
 import java.io.File
-import scala.util.{Failure, Success, Try}
+import scala.io.Source
+import scala.util.{Failure, Success, Try, Using}
 
 /**
  * Core similarity-processing pipeline for source documents.
@@ -111,17 +112,26 @@ object SimilarDocs:
       |usage: SimilarDocs <options>
       |
       |<options>:
-      |	-inputPipeFile=<path> Input pipe document file. Contain documents(one per line) used to look for similar ones.
-      |	-schema=<pos>:<fieldName>,...,<pos>:<fieldName> Associate the csv field position (starting from 0)
-      |		with the Lucene document field's name. Only the fields present in the confFile.
-      |	-confFile=<path>      Configuration file. See documentation for configuration file description.
-      |	[-otherFields=<field1>,<field2>,...,<fieldN>]  Field names  not present in the schema but that
-      |		should be included in the output report.
-      |	[-auxQuery=<str>]     Auxiliary query used to complement the one used from searchField.
-      |	[-maxDocs=<num>]      Maximum number of similar documents to be retrived. Default value is 100.
-      |	[-encoding=<codec>]   Encoding of the input pipe file. Default value is utf-8.
-      |	[-fieldSep=<char>]    Character used to separate the fields of the pipe file. Default value is ´|´
-      |	[--hasHeader]         If present, it will skip the first line of the csv file""".stripMargin
+      |	-inputCsvFile=<path>
+      |     Input csv document file. Contain documents(one per line) used to look for similar ones.
+      |	-schema=(<pos>=<fieldName>,...,<pos>=<fieldName>|file=<path>)
+      |     Associate the csv field position (starting from 0) with the Lucene document field's name.
+      |     If the parameter starts with file= then the corresponding schema file path will be used.
+      |     Specify only fields present in the confFile.
+      |	-confFile=<path>
+      |     Configuration file. See documentation for configuration file description.
+      |	[-otherFields=<field1>,<field2>,...,<fieldN>]
+      |     Field names  not present in the schema but that should be included in the output report.
+      |	[-auxQuery=<str>]
+      |     Auxiliary query used to complement the one used from searchField.
+      |	[-maxDocs=<num>]
+      |     Maximum number of similar documents to be retrieved. Default value is 1000.
+      |	[-encoding=<codec>]
+      |     Encoding of the input csv file. Default value is utf-8.
+      |	[-fieldSep=<char>]
+      |     Character used to separate the fields of the input csv file. Default value is ´,´
+      |	[--hasHeader]
+      |     If present, it will skip the first line of the input csv file""".stripMargin
 
   /**
    * Entry point used when the application is executed from the command line.
@@ -143,15 +153,16 @@ object SimilarDocs:
   private def run(args: Array[String]): Try[Unit] =
     for
       parameters <- parseArgs(args)
-      _ <- requireParameters(parameters, "inputPipeFile", "schema", "confFile")
+      _ <- requireParameters(parameters, "inputCsvFile", "schema", "confFile")
       configured <- ConfMain.parseConfig(new File(parameters("confFile")))
       (finder, filters, reporters) = configured
-      schema <- parseSchema(parameters("schema"))
+      schemaContent <- readSchema(parameters("schema").trim)
+      schema <- parseSchema(schemaContent)
       encoding = parameters.getOrElse("encoding", "utf-8")
-      fieldSep = parameters.getOrElse("fieldSep", "|").headOption.getOrElse('|')
-      docProducer = new CSVProducer(parameters("inputPipeFile"), schema, parameters.contains("hasHeader"), fieldSeparator = fieldSep, encoding)
+      fieldSep = parameters.getOrElse("fieldSep", ",").headOption.getOrElse(',')
+      docProducer = new CSVProducer(parameters("inputCsvFile"), schema, parameters.contains("hasHeader"), fieldSeparator = fieldSep, encoding)
       auxQuery = parameters.get("auxQuery")
-      maxDocs = parameters.getOrElse("maxDocs", "100").toInt
+      maxDocs = parameters.getOrElse("maxDocs", "1000").toInt
       otherFields = parameters.getOrElse("otherFields", "").trim.split(" *, *").map(_.trim).filter(_.nonEmpty).toSeq
       similarDocs = new SimilarDocs(finder, filters, reporters, auxQuery, maxDocs, otherFields)
       _ <- docProducer.getDocuments.foldLeft(Try(())):
@@ -189,6 +200,17 @@ object SimilarDocs:
     else Failure(IllegalArgumentException(usageMessage))
 
   /**
+   * Loads the schema definition from inline text or an external file.
+   *
+   * @param schema raw schema argument received from the command line
+   * @return schema content ready to be parsed
+   */
+  private def readSchema(schema: String): Try[String] =
+    if schema.startsWith("file=") then
+      Using(Source.fromFile(schema.substring(5)))(_.mkString.trim)
+    else Success(schema)
+
+  /**
    * Parses the schema argument into a positional field mapping.
    *
    * @param rawSchema raw schema string received from the command line
@@ -197,7 +219,7 @@ object SimilarDocs:
   private def parseSchema(rawSchema: String): Try[Map[Int, String]] =
     Try:
       rawSchema.trim.split(" *, *").iterator.filter(_.nonEmpty).map(_.trim).map:
-        _.split(" *: *", 2)
+        _.split(" *= *", 2)
       .map:
         case Array(index, field) => index.trim.toInt -> field.trim
         case other => throw IllegalArgumentException(s"Invalid schema entry: ${other.mkString(":")}")
