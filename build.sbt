@@ -2,14 +2,15 @@ name := "DeDup2"
 
 version := "0.1"
 
-scalaVersion := "3.8.2"
+scalaVersion := "3.8.3"
 
-val luceneVersion = "10.3.2"
+val luceneVersion = "10.4.0"
 val stringDistanceVersion = "1.2.7"
 val commonsCVSVersion = "1.14.1"
-val playJsonVersion = "3.1.0-M1"
+val playJsonVersion = "3.1.0-M10"
 val mysqlConnectorJVersion = "9.6.0"
-val mongoVersion = "5.6.3"
+val mongoVersion = "5.6.5"
+val munitVersion = "1.3.0"
 
 libraryDependencies ++= Seq(
   "org.apache.lucene" % "lucene-analysis-common" % luceneVersion,
@@ -21,7 +22,7 @@ libraryDependencies ++= Seq(
   "org.playframework" %% "play-json" % playJsonVersion,
   "com.mysql" % "mysql-connector-j" % mysqlConnectorJVersion,
   "org.mongodb" % "mongodb-driver-sync" % mongoVersion,
-  "org.scalameta" %% "munit" % "1.2.1" % Test
+  "org.scalameta" %% "munit" % munitVersion % Test
 )
 
 /*assembly / assemblyMergeStrategy := {
