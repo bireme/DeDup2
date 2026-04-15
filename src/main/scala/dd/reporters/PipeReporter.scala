@@ -122,7 +122,7 @@ class PipeReporter(writer: Writer,
                                  results: Seq[CompResult]): Try[Unit] =
     if results.count(_.isSimilar) < minTrue then Try(())
     else
-      val serialized = serializeRow(originalDoc, currentDoc, otherFields, results)
+      val serialized: Seq[String] = serializeRow(originalDoc, currentDoc, otherFields, results)
       Try:
         if rowWritten then writer.write("\n")
         writer.write(format.format(serialized*))
