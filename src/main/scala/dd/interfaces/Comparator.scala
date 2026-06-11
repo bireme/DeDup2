@@ -9,6 +9,14 @@ package dd.interfaces
  */
 abstract class Comparator:
   /**
+   * Indicates whether this comparator controls whether a document pair may be
+   * sent to reporters.
+   *
+   * @return true when the comparator should act as a reporting gate
+   */
+  def isGate: Boolean = false
+
+  /**
    * Compares the input documents and returns the comparison result.
    *
    * @param originalDoc source document used in the comparison

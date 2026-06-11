@@ -1,26 +1,62 @@
 package dd
 
 import dd.configurators.ConfMain
-import dd.interfaces.{CompResult, Comparator, DocsFinder, Document, Reporter}
-import dd.producers.CSVProducer
+import dd.configurators.ConfMain.{ConfiguredReporter, SimilarDocsConfig}
+import dd.interfaces.{CompResult, Comparator, DocsFinder, DocsProducer, Document, Reporter}
 
 import java.io.File
-import scala.io.Source
-import scala.util.{Failure, Success, Try, Using}
+import scala.util.{Failure, Success, Try}
 
 /**
  * Core similarity-processing pipeline for source documents.
  *
- * The class coordinates candidate retrieval, comparator execution, and result
- * reporting for each input document while keeping the finder, comparators, and
- * reporters decoupled from the orchestration logic.
+ * The public constructor receives only the JSON configuration file. The
+ * configuration supplies the source producer, finder, comparators, reporters,
+ * and reporter-specific output fields.
  */
-class SimilarDocs(finder: DocsFinder,
-                  filters: Seq[Comparator],
-                  reporters: Seq[Reporter],
-                  auxQuery: Option[String],
-                  maxDocs: Int,
-                  otherFields: Seq[String]):
+class SimilarDocs private[dd] (config: SimilarDocsConfig):
+  def this(configFile: File) =
+    this(ConfMain.parseSimilarDocsConfig(configFile).get)
+
+  private[dd] def this(finder: DocsFinder,
+                       filters: Seq[Comparator],
+                       reporters: Seq[Reporter],
+                       auxQuery: Option[String],
+                       maxDocs: Option[Int],
+                       otherFields: Seq[String]) =
+    this(
+      SimilarDocsConfig(
+        producer = new DocsProducer:
+          override def getDocuments: LazyList[Document] = LazyList.empty,
+        finder = finder,
+        comparators = filters,
+        reporters = reporters.map(reporter => ConfiguredReporter(reporter, otherFields)),
+        auxQuery = auxQuery,
+        maxDocs = maxDocs
+      )
+    )
+
+  private val finder: DocsFinder = config.finder
+  private val filters: Seq[Comparator] = config.comparators
+  private val reporters: Seq[ConfiguredReporter] = config.reporters
+  private val auxQuery: Option[String] = config.auxQuery
+  private val maxDocs: Option[Int] = config.maxDocs
+
+  /**
+   * Runs the complete similarity workflow for the configured source producer.
+   *
+   * @return result of processing all configured source documents
+   */
+  def run(): Try[Unit] =
+    closeAfter:
+      config.producer.getDocuments.zipWithIndex.foldLeft(Try(())):
+        case (acc, (document, index)) =>
+          acc.flatMap:
+            _ =>
+              processSimilars(document).map:
+                _ =>
+                  val pos = index + 1
+                  if pos % 100 == 0 then println(s"+++$pos")
 
   /**
    * Processes the similar documents for the given source document.
@@ -38,15 +74,17 @@ class SimilarDocs(finder: DocsFinder,
    * Closes the underlying resources.
    * @return result of closing the underlying resources
    */
-  def close(): Try[Unit] = Try:
-    finder.close().get
-    reporters.foreach(_.close().get)
+  def close(): Try[Unit] =
+    val closeResults = finder.close() +: reporters.map(_.reporter.close())
+    closeResults.collectFirst:
+      case Failure(exception) => Failure(exception)
+    .getOrElse(Success(()))
 
   /**
-   * Finds and evaluates documents similar to the given source document.
+   * Finds candidate documents and computes comparison results for them.
    *
-   * @param originalDoc source document used in the comparison
-   * @return lazy list of matched documents and their comparison results
+   * @param originalDoc source document used in the search and comparison
+   * @return matched documents paired with their comparison results
    */
   private def similar(originalDoc: Document): Try[LazyList[(Document, Seq[CompResult])]] =
     for
@@ -54,7 +92,9 @@ class SimilarDocs(finder: DocsFinder,
       query <- originalDoc.fields.collectFirst:
         case (`searchField`, value) => value
       .toRight(IllegalArgumentException("Empty search field")).toTry
-      producer <- finder.findDocs(query, auxQuery, maxDocs)
+      producer <- maxDocs match
+        case Some(value) => finder.findDocs(searchField, query, auxQuery, value)
+        case None => finder.findDocs(searchField, query, auxQuery)
     yield getResults(originalDoc, producer.getDocuments)
 
   /**
@@ -90,48 +130,58 @@ class SimilarDocs(finder: DocsFinder,
   private def notifyReporters(originalDoc: Document,
                               currentDoc: Document,
                               results: Seq[CompResult]): Try[Unit] =
-    reporters.foldLeft(Try(())):
-      case (acc, reporter) =>
-        acc.flatMap(_ => reporter.writeResults(originalDoc, currentDoc, otherFields, results))
+    if results.zip(filters).exists:
+      case (result, comparator) => comparator.isGate && result.isSimilar
+    then
+      reporters.foldLeft(Try(())):
+        case (acc, configuredReporter) =>
+          acc.flatMap:
+            _ =>
+              configuredReporter.reporter.writeResults(
+                originalDoc,
+                currentDoc,
+                configuredReporter.otherFields,
+                results
+              )
+    else Success(())
+
+  /**
+   * Runs an operation and closes the similarity pipeline afterward.
+   *
+   * @param operation operation to execute before closing resources
+   * @return result of the operation, preserving close failures when appropriate
+   */
+  private def closeAfter(operation: => Try[Unit]): Try[Unit] =
+    val operationResult = Try(operation).flatten
+    val closeResult = close()
+
+    operationResult match
+      case Success(_) => closeResult
+      case Failure(exception) =>
+        closeResult.failed.foreach(exception.addSuppressed)
+        Failure(exception)
 
 /**
  * Command-line entrypoint for the generic similarity-processing pipeline.
  *
- * This object parses the runtime arguments, loads the external configuration,
- * streams the input documents from CSV, and delegates the processing work to
- * the shared `SimilarDocs` orchestration class.
+ * This object accepts only a configuration file path. Runtime parameters that
+ * used to be passed through the command line now belong to the configured
+ * producer, finder, comparator, and reporter blocks.
  */
 object SimilarDocs:
+  private val requiredSchemaFields: Seq[String] = Seq("dbase", "id")
+
   /**
    * Prints the command usage information and exits.
    * @return no value; this method terminates the application
    */
   private val usageMessage: String =
-    """Check for duplicated documents in a database/index.
+    """\nCheck for duplicated documents in a database/index.
       |
-      |usage: SimilarDocs <options>
+      |usage: SimilarDocs <configFile>
       |
-      |<options>:
-      |	-inputCsvFile=<path>
-      |     Input csv document file. Contain documents(one per line) used to look for similar ones.
-      |	-schema=(<pos>=<fieldName>,...,<pos>=<fieldName>|file=<path>)
-      |     Associate the csv field position (starting from 0) with the Lucene document field's name.
-      |     If the parameter starts with file= then the corresponding schema file path will be used.
-      |     Specify only fields present in the confFile.
-      |	-confFile=<path>
-      |     Configuration file. See documentation for configuration file description.
-      |	[-otherFields=<field1>,<field2>,...,<fieldN>]
-      |     Field names  not present in the schema but that should be included in the output report.
-      |	[-auxQuery=<str>]
-      |     Auxiliary query used to complement the one used from searchField.
-      |	[-maxDocs=<num>]
-      |     Maximum number of similar documents to be retrieved. Default value is 1000.
-      |	[-encoding=<codec>]
-      |     Encoding of the input csv file. Default value is utf-8.
-      |	[-fieldSep=<char>]
-      |     Character used to separate the fields of the input csv file. Default value is ´,´
-      |	[--hasHeader]
-      |     If present, it will skip the first line of the input csv file""".stripMargin
+      |<configFile>:
+      |     JSON configuration file containing producer, finder, comparators, and reporters.""".stripMargin
 
   /**
    * Entry point used when the application is executed from the command line.
@@ -143,6 +193,7 @@ object SimilarDocs:
     run(args).recover:
       case exception =>
         Console.err.println(exception.getMessage)
+        sys.exit(1)
 
   /**
    * Executes the command-line workflow with the provided arguments.
@@ -152,75 +203,38 @@ object SimilarDocs:
    */
   private def run(args: Array[String]): Try[Unit] =
     for
-      parameters <- parseArgs(args)
-      _ <- requireParameters(parameters, "inputCsvFile", "schema", "confFile")
-      configured <- ConfMain.parseConfig(new File(parameters("confFile")))
-      (finder, filters, reporters) = configured
-      schemaContent <- readSchema(parameters("schema").trim)
-      schema <- parseSchema(schemaContent)
-      encoding = parameters.getOrElse("encoding", "utf-8")
-      fieldSep = parameters.getOrElse("fieldSep", ",").headOption.getOrElse(',')
-      docProducer = new CSVProducer(parameters("inputCsvFile"), schema, parameters.contains("hasHeader"), fieldSeparator = fieldSep, encoding)
-      auxQuery = parameters.get("auxQuery")
-      maxDocs = parameters.getOrElse("maxDocs", "1000").toInt
-      otherFields = parameters.getOrElse("otherFields", "").trim.split(" *, *").map(_.trim).filter(_.nonEmpty).toSeq
-      similarDocs = new SimilarDocs(finder, filters, reporters, auxQuery, maxDocs, otherFields)
-      _ <- docProducer.getDocuments.foldLeft(Try(())):
-        case (acc, document) => acc.flatMap(_ => similarDocs.processSimilars(document))
-      _ <- similarDocs.close()
+      configFile <- parseConfigFile(args)
+      similarDocs <- Try(new SimilarDocs(configFile))
+      _ <- similarDocs.run()
     yield ()
 
-  /**
-   * Parses command-line arguments into a name/value map.
-   *
-   * @param args command-line arguments received by the application
-   * @return parsed parameter map
-   */
-  private def parseArgs(args: Array[String]): Try[Map[String, String]] =
-    Success(args.foldLeft(Map.empty[String, String]):
-      case (map, par) =>
-        val split = par.split(" *= *", 2)
-        split.size match
-          case 1 => map + (split(0).substring(2) -> "")
-          case 2 => map + (split(0).substring(1) -> split(1))
-          case _ => map
-    )
+  private def parseConfigFile(args: Array[String]): Try[File] =
+    args.toSeq match
+      case Seq(value) if value.startsWith("-confFile=") && value.length > "-confFile=".length =>
+        Success(new File(value.substring("-confFile=".length)))
+      case Seq(value) if value.nonEmpty && !value.startsWith("-") =>
+        Success(new File(value))
+      case _ =>
+        Failure(IllegalArgumentException(usageMessage))
 
   /**
-   * Validates whether the required parameters are present.
+   * Validates whether the input schema contains all required report identifiers.
    *
-   * @param parameters parsed command-line parameter map
-   * @param required parameter names that must be available
-   * @return result indicating whether the validation succeeded
+   * @param schema input CSV schema mapping column positions to field names
+   * @return successful result when all required fields are present
    */
-  private def requireParameters(parameters: Map[String, String],
-                                required: String*): Try[Unit] =
-    val missing = required.filterNot(parameters.contains)
+  private[dd] def requireSchemaFields(schema: Map[Int, String]): Try[Unit] =
+    val schemaFields: Set[String] = schema.values.toSet
+    val missing: Seq[String] = requiredSchemaFields.filterNot(schemaFields.contains)
     if missing.isEmpty then Success(())
-    else Failure(IllegalArgumentException(usageMessage))
+    else
+      Failure(IllegalArgumentException(s"Schema missing required field(s): ${missing.mkString(", ")}"))
 
   /**
-   * Loads the schema definition from inline text or an external file.
+   * Prepends required report fields while preserving caller-provided fields.
    *
-   * @param schema raw schema argument received from the command line
-   * @return schema content ready to be parsed
+   * @param otherFields additional fields requested by the user
+   * @return report fields including required identifiers without duplicates
    */
-  private def readSchema(schema: String): Try[String] =
-    if schema.startsWith("file=") then
-      Using(Source.fromFile(schema.substring(5)))(_.mkString.trim)
-    else Success(schema)
-
-  /**
-   * Parses the schema argument into a positional field mapping.
-   *
-   * @param rawSchema raw schema string received from the command line
-   * @return result containing the parsed schema map
-   */
-  private def parseSchema(rawSchema: String): Try[Map[Int, String]] =
-    Try:
-      rawSchema.trim.split(" *, *").iterator.filter(_.nonEmpty).map(_.trim).map:
-        _.split(" *= *", 2)
-      .map:
-        case Array(index, field) => index.trim.toInt -> field.trim
-        case other => throw IllegalArgumentException(s"Invalid schema entry: ${other.mkString(":")}")
-      .toMap
+  private[dd] def includeRequiredReportFields(otherFields: Seq[String]): Seq[String] =
+    ConfMain.includeRequiredReportFields(otherFields)

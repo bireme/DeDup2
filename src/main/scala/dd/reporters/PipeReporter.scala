@@ -16,13 +16,14 @@ import scala.util.Try
 class PipeReporter(writer: Writer,
                    recordSeparator: String,
                    putHeader: Boolean,
-                   minTrue: Int) extends Reporter:
+                   minTrue: Int,
+                   flushResults: Boolean = false) extends Reporter:
   private val fieldSeparator: String = "|"
   private val formatBuilder: CSVFormat.Builder = CSVFormat.Builder.create().setRecordSeparator(recordSeparator).setTrim(true)
     .setDelimiter(fieldSeparator).setAutoFlush(true)
   private val format: CSVFormat = formatBuilder.get()
   private var headerWritten: Boolean = !putHeader
-  private var rowWritten: Boolean = false
+  private var lineWritten: Boolean = false
 
   /**
    * Writes the comparison results.
@@ -36,12 +37,13 @@ class PipeReporter(writer: Writer,
   override def writeResults(originalDoc: Document,
                             currentDoc: Document,
                             otherFields: Seq[String],
-                            results: Seq[CompResult]): Try[Unit] =
+                            results: Seq[CompResult]): Try[Unit] = {
     for
       _ <- requireNonEmpty(results)
       _ <- ensureHeader(otherFields, results)
       _ <- writeRowIfEligible(originalDoc, currentDoc, otherFields, results)
     yield ()
+  }
 
   /**
    * Closes the underlying resources.
@@ -61,9 +63,13 @@ class PipeReporter(writer: Writer,
                           otherFields: Seq[String],
                           results: Seq[CompResult]): Try[Unit] =
     val header = otherFields.flatMap(fld => Seq(s"${fld.trim}_1", s"${fld.trim}_2")) ++
-      results.flatMap(_ => Seq("Comparator", "Field", "Content1", "Content2", "Similarity", "isSimilar"))
+      results.flatMap(_ => Seq("Comparator", "Field", "originalField", "currentField", "originalFieldOther",
+        "currentFieldOther", "Similarity", "isSimilar"))
 
-    Try(writer.write(format.format(header*)))
+    Try:
+      writer.write(format.format(header*))
+      lineWritten = true
+      flushIfRequested()
 
   /**
    * Returns the selected extra fields for both documents.
@@ -75,21 +81,32 @@ class PipeReporter(writer: Writer,
    */
   private def getOtherFields(originalDoc: Document,
                              currentDoc: Document,
-                             otherFields: Seq[String]): (Seq[String], Seq[String]) =
+                             otherFields: Seq[String]): Seq[String] =
     /**
      * Collects the requested field values from the document.
      *
      * @param doc document to insert or serialize
      * @return serialized field values extracted from the document
      */
-    def collectFields(doc: Document): Seq[String] =
-      otherFields.flatMap:
-        oField =>
-          val seq: Seq[String] = doc.fields.filter(_._1.equals(oField)).map(_._2)
-          Option.when(seq.nonEmpty)(seq.mkString(fieldSeparator))
+    /**
+     * Collects and joins all values for a requested field.
+     *
+     * @param doc document that provides the field values
+     * @param oField field name to collect
+     * @return joined field value, or the empty string when absent
+     */
+    def collectField(doc: Document, oField: String): String =
+      doc.fields.filter(_._1.equals(oField)).map(_._2).mkString(fieldSeparator)
 
-    (collectFields(originalDoc), collectFields(currentDoc))
+    otherFields.flatMap:
+      oField => Seq(collectField(originalDoc, oField), collectField(currentDoc, oField))
 
+  /**
+   * Validates that a report row has comparison results.
+   *
+   * @param results comparison results produced for the current document pair
+   * @return successful result when the sequence is non-empty
+   */
   private def requireNonEmpty(results: Seq[CompResult]): Try[Unit] =
     Try:
       require(results.nonEmpty, "Empty results sequence")
@@ -119,14 +136,20 @@ class PipeReporter(writer: Writer,
   private def writeRowIfEligible(originalDoc: Document,
                                  currentDoc: Document,
                                  otherFields: Seq[String],
-                                 results: Seq[CompResult]): Try[Unit] =
+                                 results: Seq[CompResult]): Try[Unit] = {
+    if results.count(_.isSimilar) >= minTrue then println(s"isSimilar count=${results.count(_.isSimilar)} min=$minTrue")
     if results.count(_.isSimilar) < minTrue then Try(())
     else
       val serialized: Seq[String] = serializeRow(originalDoc, currentDoc, otherFields, results)
       Try:
-        if rowWritten then writer.write("\n")
+        if lineWritten then writer.write(recordSeparator)
         writer.write(format.format(serialized*))
-        rowWritten = true
+        lineWritten = true
+        flushIfRequested()
+  }
+
+  private def flushIfRequested(): Unit =
+    if flushResults then writer.flush()
 
   /**
    * Serializes the current comparison into an output row.
@@ -141,8 +164,8 @@ class PipeReporter(writer: Writer,
                            currentDoc: Document,
                            otherFields: Seq[String],
                            results: Seq[CompResult]): Seq[String] =
-    val (originalFields, currentFields) = getOtherFields(originalDoc, currentDoc, otherFields)
-    originalFields ++ currentFields ++ results.flatMap(getResultFields)
+    val otherFieldValues = getOtherFields(originalDoc, currentDoc, otherFields)
+    (otherFieldValues ++ results.flatMap(getResultFields)).map(nullIfEmpty)
 
   /**
    * Returns the serialized values of a comparison result.
@@ -152,6 +175,17 @@ class PipeReporter(writer: Writer,
    */
   private def getResultFields(result: CompResult): Seq[String] =
     Seq(result.name, result.fieldName,
-      result.originalFieldOther.getOrElse(result.originalField),
-      result.currentFieldOther.getOrElse(result.currentField),
+      result.originalField,
+      result.currentField,
+      result.originalFieldOther.getOrElse(""),
+      result.currentFieldOther.getOrElse(""),
       result.similarity.toString, result.isSimilar.toString)
+
+  /**
+   * Converts empty output cells to the textual null marker.
+   *
+   * @param value serialized cell value
+   * @return original value or "null" when empty
+   */
+  private def nullIfEmpty(value: String): String =
+    if value.isEmpty then "null" else value

@@ -31,11 +31,13 @@ class ExactComparator(fieldName: String,
     if normalize then
       val oStringNorm: String = Tools.normalizeStr(oString)
       val cStringNorm: String = Tools.normalizeStr(cString)
-      val similar: Boolean = oStringNorm.equals(cStringNorm)
+      val bothEmpty = oStringNorm.isEmpty && cStringNorm.isEmpty
+      val similar: Boolean = !bothEmpty && oStringNorm.equals(cStringNorm)
 
       CompResult("ExactComparator", fieldName, oString, cString, Some(oStringNorm), Some(cStringNorm),
         if similar then 1 else 0, similar)
     else
-      val similar: Boolean = oString.equals(cString)
+      val bothEmpty = oString.isEmpty && cString.isEmpty
+      val similar: Boolean = !bothEmpty && oString.equals(cString)
 
       CompResult("ExactComparator", fieldName, oString, cString, None, None, if similar then 1 else 0, similar)

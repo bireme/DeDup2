@@ -2,6 +2,7 @@ package dd.finders
 
 import dd.NGAnalyzer
 import dd.interfaces.{DocsFinder, DocsProducer, Document}
+import dd.tools.NGram
 import dd.tools.Tools
 import org.apache.lucene.index.DirectoryReader
 import org.apache.lucene.queryparser.classic.QueryParser
@@ -20,7 +21,10 @@ import scala.util.Try
  * a lazy producer consumed by the rest of the deduplication pipeline.
  */
 class LuceneDocsFinder(luceneIndex: String,
-                       searchField: String) extends DocsFinder:
+                       searchField: String,
+                       minSimilarity: Double) extends DocsFinder:
+  require(minSimilarity >= 0.0 && minSimilarity <= 1.0)
+
   private val indexPath: Path = new File(luceneIndex).toPath
   private val directory: Directory = FSDirectory.open(indexPath)
   private val ireader: DirectoryReader = DirectoryReader.open(directory)
@@ -30,25 +34,30 @@ class LuceneDocsFinder(luceneIndex: String,
   /**
    * Finds the documents that match the given query.
    *
+   * @param searchField field used to find the query
    * @param query main query string used to search for documents
    * @param auxQuery optional secondary query used to refine the search
    * @param maxDocs maximum number of documents to retrieve
    * @return result containing the produced documents
    */
-  def findDocs(query: String,
+  def findDocs(searchField: String,
+               query: String,
                auxQuery: Option[String],
-               maxDocs: Int = 100): Try[DocsProducer] =
+               maxDocs: Int = 1000): Try[DocsProducer] =
     Try:
       require(query != null)
 
-      val parser: QueryParser = new QueryParser("", analyzer)
-      val qur: Query = parser.parse(auxQuery match
-        case Some(aqry) => s"$searchField:($query) AND $aqry"
-        case None => s"$searchField:($query)"
-      )
-
+      val parser: QueryParser = new QueryParser(searchField, analyzer)
+      val qryStr: String = auxQuery match
+        case Some(aqry) => s"$searchField:${escapeLucene(query)} AND $aqry"
+        case None => escapeLucene(query)
+      val qur: Query = parser.parse(qryStr)
       val hits: Array[ScoreDoc] = isearcher.search(qur, maxDocs).scoreDocs
-      val ids: List[Int] = hits.map(sd => sd.doc).toList
+      val normalizedQuery = Tools.normalizeStr(query)
+      val ids: List[Int] = hits.iterator
+        .map(sd => sd.doc)
+        .filter(docId => isSimilar(normalizedQuery, ireader.storedFields().document(docId).get(searchField)))
+        .toList
 
       new DocsProducer:
         /**
@@ -56,6 +65,40 @@ class LuceneDocsFinder(luceneIndex: String,
          * @return lazy list of produced documents
          */
         def getDocuments: LazyList[Document] = lazyList(ids)
+
+  /**
+   * Escapes Lucene query syntax characters from user-provided text.
+   *
+   * @param input raw query text
+   * @return query text escaped for Lucene parsing
+   */
+  private def escapeLucene(input: String): String =
+    val specialChars = Set(
+      '+', '-', '&', '|', '!', '(', ')', '{', '}', '[', ']', '^',
+      '"', '~', '*', '?', ':', '\\', '/'
+    )
+
+    val sb = new StringBuilder
+
+    var i = 0
+    while i < input.length do
+      val c = input.charAt(i)
+
+      if i + 1 < input.length then
+        val next = input.charAt(i + 1)
+        if (c == '&' && next == '&') || (c == '|' && next == '|') then
+          sb.append('\\').append(c).append('\\').append(next)
+          i += 2
+        else
+          if specialChars.contains(c) then sb.append('\\')
+          sb.append(c)
+          i += 1
+      else
+        if specialChars.contains(c) then sb.append('\\')
+        sb.append(c)
+        i += 1
+
+    sb.toString
 
   /**
    * Returns the configured search field, if any.
@@ -81,3 +124,9 @@ class LuceneDocsFinder(luceneIndex: String,
   private def lazyList(list: List[Int]): LazyList[Document] = list match
     case h :: t => Tools.doc2doc(ireader.storedFields().document(h)) #:: lazyList(t)
     case Nil => LazyList[Document]()
+
+  private def isSimilar(normalizedQuery: String,
+                        candidate: String): Boolean =
+    val normalizedCandidate = Tools.normalizeStr(Option(candidate).getOrElse(""))
+    normalizedQuery.nonEmpty && normalizedCandidate.nonEmpty &&
+      NGram.score(normalizedQuery, normalizedCandidate) >= minSimilarity

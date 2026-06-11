@@ -2,10 +2,13 @@ package dd.comparators
 
 import dd.interfaces.{CompResult, Comparator, Document}
 import dd.tools.StringSimilarity.DiceCoefficient
-import org.bireme.covid.SplitAuthors
+import org.apache.commons.csv.CSVFormat
 
+import java.io.StringReader
 import java.text.Normalizer
 import java.text.Normalizer.Form
+import java.util.regex.Pattern
+import scala.jdk.CollectionConverters.*
 import scala.io.Source
 import scala.util.{Failure, Success, Try, Using}
 
@@ -16,10 +19,10 @@ import scala.util.{Failure, Success, Try, Using}
  * and then compares the author sequences using similarity heuristics tailored
  * to abbreviated names and reordered author strings.
  */
-class AuthorsComparator(fieldName: String) extends Comparator:
-  private val occSeparator = ";"
-  private val shortNameSimilarityThreshold = 0.4
-  private val generalSimilarityThreshold = 0.5
+class AuthorsComparator(fieldName: String,
+                        occSeparator: String = "//@//") extends Comparator:
+  private val shortNameSimilarityThreshold: Double = 0.4
+  private val generalSimilarityThreshold: Double = 0.5
 
   /**
    * Compares the input documents and returns the comparison result.
@@ -32,8 +35,8 @@ class AuthorsComparator(fieldName: String) extends Comparator:
                        currentDoc: Document): CompResult =
     val (rawOriSeq, oriSeq) = getAuthors(fieldName, originalDoc)
     val (rawCurSeq, curSeq) = getAuthors(fieldName, currentDoc)
-    val originalAuthors = rawOriSeq.mkString(occSeparator)
-    val currentAuthors = rawCurSeq.mkString(occSeparator)
+    val originalAuthors: String = rawOriSeq.mkString(occSeparator)
+    val currentAuthors: String = rawCurSeq.mkString(occSeparator)
 
     /**
      * Builds a comparison result for the current author sets.
@@ -42,11 +45,12 @@ class AuthorsComparator(fieldName: String) extends Comparator:
      * @param isSimilar flag indicating whether the compared values matched
      * @return comparison result created for the current author sets
      */
-    def buildResult(score: Int, isSimilar: Boolean): CompResult =
+    def buildResult(score: Int,
+                    isSimilar: Boolean): CompResult =
       CompResult("AuthorsComparator", fieldName, originalAuthors, currentAuthors, None, None, score, isSimilar)
 
-    if rawOriSeq.isEmpty && rawCurSeq.isEmpty then
-      buildResult(score = 1, isSimilar = true)
+    if originalAuthors.trim.isEmpty && currentAuthors.trim.isEmpty then
+      buildResult(score = 0, isSimilar = false)
     else if rawOriSeq.isEmpty != rawCurSeq.isEmpty then
       buildResult(score = 0, isSimilar = false)
     else
@@ -69,16 +73,27 @@ class AuthorsComparator(fieldName: String) extends Comparator:
   private def getAuthors(fieldName: String,
                          document: Document,
                          fixOccSeparator: Boolean = true): (Seq[String], Seq[String]) =
-    val originalAuthors = document.fields.collect:
+    val originalAuthors: Seq[String] = document.fields.collect:
       case (`fieldName`, value) => value
 
-    val rawAuthors =
-      if fixOccSeparator then originalAuthors.flatMap(author => SplitAuthors.getAuthors(author, ",", occSeparator))
+    val rawAuthors: Seq[String] =
+      if fixOccSeparator then originalAuthors.flatMap(author => getAuthors(author, occSeparator))
       else originalAuthors.flatMap(_.split(s" *$occSeparator *"))
 
-    val normalizedAuthors = rawAuthors.map(normalizeAuthorName)
+    val normalizedAuthors: Seq[String] = rawAuthors.map(normalizeAuthorName)
 
     (rawAuthors, normalizedAuthors)
+
+  private def getAuthors(field: String,
+                         authorSeparator: String): Seq[String] =
+    if field.isEmpty then Seq[String]()
+    else if field.contains(authorSeparator) then field.split(Pattern.quote(authorSeparator)).toSeq // line already processed
+    else if field.contains(";") then separateBySemicolon(field)
+    else Seq(field.trim)
+
+  private def separateBySemicolon(field: String): Seq[String] =
+    CSVFormat.Builder.create().setDelimiter(';').setTrim(true).get().
+      parse(new StringReader(field)).asScala.head.asScala.toSeq.map(_.trim)
 
   /**
    * Normalizes an author name for comparison.
@@ -177,6 +192,12 @@ object AuthorsComparator:
       case None =>
         Failure(IllegalArgumentException(usageMessage))
 
+  /**
+   * Processes one command-line input pair and prints non-similar author lists.
+   *
+   * @param line input line containing two author lists separated by a pipe
+   * @return no value; this method writes diagnostic output when needed
+   */
   private def processLine(line: String): Unit =
     line.split("\\|", 2) match
       case Array(left, right) =>

@@ -5,8 +5,19 @@ if [ -z "$JAVA_HOME_25" ]; then
 fi
 PATH=$JAVA_HOME_25/bin:$PATH
 
+if [ "$#" -ne "1" ]; then
+  echo 'Check for duplicated documents in a database/index.'
+  echo
+  echo 'usage: SimilarDocs <configFile>'
+  echo
+  echo '<configFile>:'
+  echo '   JSON configuration file containing producer, finder, comparators, and reporters.'
+  exit 1
+fi
+
 cd /home/javaapps/sbt-projects/DeDup2 || exit
 
-sbt 'runMain dd.SimilarDocs $1 $2 $3 $4 $5 $6 $7 $8 $9'
+printf -v quoted_config ' %q' "$1"
+sbt "runMain dd.SimilarDocs$quoted_config"
 
 cd - || exit
