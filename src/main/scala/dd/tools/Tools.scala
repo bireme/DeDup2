@@ -33,6 +33,18 @@ object Tools:
     .replaceAll("[^a-z0-9]", "")
 
   /**
+   * Parses a comma-separated SQL file list.
+   *
+   * @param sqlfs raw sqlfs parameter value
+   * @return non-empty SQL file paths
+   */
+  def parseSqlFileList(sqlfs: String): Try[Seq[String]] =
+    Try:
+      val files = sqlfs.split(" *, *").toSeq.map(_.trim).filter(_.nonEmpty)
+      if files.isEmpty then throw IllegalArgumentException("Parameter sqlfs must contain at least one SQL file.")
+      files
+
+  /**
    * Creates a Lucene index from the produced documents.
    *
    * @param producer document producer used as the indexing source
@@ -44,21 +56,38 @@ object Tools:
   def createLuceneIndex(producer: DocsProducer,
                         indexPath: String,
                         fieldToIndex: String,
-                        analyzer: Analyzer): Try[Unit] =
+                        analyzer: Analyzer,
+                        append: Boolean = false): Try[Unit] =
     Try:
       val iPath: Path = new File(indexPath).toPath
       val directory: Directory = FSDirectory.open(iPath)
-      val config: IndexWriterConfig = new IndexWriterConfig(analyzer).setOpenMode(IndexWriterConfig.OpenMode.CREATE)
+      val openMode =
+        if append then IndexWriterConfig.OpenMode.CREATE_OR_APPEND
+        else IndexWriterConfig.OpenMode.CREATE
+      val config: IndexWriterConfig = new IndexWriterConfig(analyzer).setOpenMode(openMode)
       val iwriter: IndexWriter = new IndexWriter(directory, config)
 
       producer.getDocuments.zipWithIndex.foreach:
         case (dc, idx) =>
           if idx % 100_000 == 0 then println(s"+++$idx")
 
+          def documentFieldValue(fieldName: String): String =
+            dc.fields.collectFirst:
+              case (name, value) if name == fieldName => value
+            .getOrElse("")
+
+          val documentLabel: String =
+            val documentId: String = documentFieldValue("id").trim
+            if documentId.nonEmpty then s"id=$documentId"
+            else
+              val documentTitle: String = documentFieldValue("title").trim
+              if documentTitle.nonEmpty then s"title=$documentTitle"
+              else s"document=${dc.toString}"
+
           val lucDoc: document.Document = dc.fields.foldLeft(new org.apache.lucene.document.Document()):
             case (ldoc, (fldName, fldValue)) =>
               if fldName.equals(fieldToIndex) then
-                if fldValue.trim.isEmpty then Console.err.println("Error indexing document field is empty")
+                if fldValue.trim.isEmpty then Console.err.println(s"Error indexing document field is empty. $documentLabel")
                 else ldoc.add(new TextField(fldName, fldValue, Field.Store.YES))
               else ldoc.add(new StoredField(fldName, fldValue))
               ldoc

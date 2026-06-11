@@ -15,7 +15,7 @@ object NGram:
    * @param n size of the n-grams used in the computation
    * @return similarity score for the provided values
    */
-  def score(left: String, right: String, n: Int = 1): Double =
+  def score(left: String, right: String, n: Int = 2): Double =
     require(n > 0, "Ngram score, n-gram size must be a positive number.")
     nGram(left.toList, right.toList, n)
 
@@ -31,7 +31,7 @@ object NGram:
     if left.length < n || right.length < n then
       0d
     else if left == right then
-      tokenize(left, n).length.toDouble
+      1d
     else
       val leftTokens = tokenize(left, n)
       val rightTokens = tokenize(right, n)

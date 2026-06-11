@@ -35,11 +35,14 @@ class DiceComparator(fieldName: String,
     if normalize then
       val oStringNorm: String = Tools.normalizeStr(oString)
       val cStringNorm: String = Tools.normalizeStr(cString)
-      val diceCoefficient: Double = DiceCoefficient.score(oStringNorm, cStringNorm)
+      val bothEmpty = oStringNorm.isEmpty && cStringNorm.isEmpty
+      val diceCoefficient: Double = if bothEmpty then 0d else DiceCoefficient.score(oStringNorm, cStringNorm)
 
       CompResult("DiceComparator", fieldName, oString, cString, Some(oStringNorm), Some(cStringNorm), diceCoefficient,
-        diceCoefficient >= minSimilarity)
+        !bothEmpty && diceCoefficient >= minSimilarity)
     else
-      val diceCoefficient: Double = DiceCoefficient.score(oString, cString)
+      val bothEmpty = oString.isEmpty && cString.isEmpty
+      val diceCoefficient: Double = if bothEmpty then 0d else DiceCoefficient.score(oString, cString)
 
-      CompResult("DiceComparator", fieldName, oString, cString, None, None, diceCoefficient, diceCoefficient >= minSimilarity)
+      CompResult("DiceComparator", fieldName, oString, cString, None, None, diceCoefficient,
+        !bothEmpty && diceCoefficient >= minSimilarity)

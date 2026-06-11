@@ -15,7 +15,7 @@ import scala.annotation.tailrec
 class NGTokenizer(ngramSize: Int) extends Tokenizer:
   require(this.ngramSize >= 1)
 
-  private  val termAtt: CharTermAttribute = addAttribute(classOf[CharTermAttribute])
+  private val termAtt: CharTermAttribute = addAttribute(classOf[CharTermAttribute])
   termAtt.resizeBuffer(ngramSize)
 
   private enum TokenizationState:
@@ -82,7 +82,7 @@ class NGTokenizer(ngramSize: Int) extends Tokenizer:
       case TokenizationState.FirstPass if input.markSupported() =>
         tokenizationState = TokenizationState.ReplayPass
         input.reset()
-        input.skip(ngramSize - 1)  // Replace the initial position of tokenization
+        input.skip(ngramSize - 1)
         Some(tokenizationState)
       case TokenizationState.FirstPass | TokenizationState.ReplayPass | TokenizationState.Finished =>
         tokenizationState = TokenizationState.Finished

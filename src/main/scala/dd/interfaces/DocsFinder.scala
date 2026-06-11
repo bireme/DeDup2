@@ -13,12 +13,27 @@ trait DocsFinder:
   /**
    * Finds the documents that match the given query.
    *
+   * @param searchField field used to find the query
+   * @param query main query string used to search for documents
+   * @param auxQuery optional secondary query used to refine the search
+   * @return result containing the produced documents
+   */
+  def findDocs(searchField: String,
+               query: String,
+               auxQuery: Option[String]): Try[DocsProducer] =
+    findDocs(searchField, query, auxQuery, maxDocs = 1000)
+
+  /**
+   * Finds the documents that match the given query.
+   *
+   * @param searchField field used to find the query
    * @param query main query string used to search for documents
    * @param auxQuery optional secondary query used to refine the search
    * @param maxDocs maximum number of documents to retrieve
    * @return result containing the produced documents
    */
-  def findDocs(query: String,
+  def findDocs(searchField: String,
+               query: String,
                auxQuery: Option[String],
                maxDocs: Int): Try[DocsProducer]
 

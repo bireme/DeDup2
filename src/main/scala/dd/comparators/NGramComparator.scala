@@ -2,6 +2,7 @@ package dd.comparators
 
 import dd.interfaces.{CompResult, Comparator, Document}
 import dd.tools.NGram
+import dd.tools.StringSimilarity.DiceCoefficient
 import dd.tools.Tools
 
 /**
@@ -17,6 +18,7 @@ class NGramComparator(fieldName: String,
   require(minSimilarity <= 1.0)
 
   val fieldSeparator: String = "¦"
+  override val isGate: Boolean = true
 
   /**
    * Compares the input documents and returns the comparison result.
@@ -35,11 +37,20 @@ class NGramComparator(fieldName: String,
     if normalize then
       val oStringNorm: String = Tools.normalizeStr(oString)
       val cStringNorm: String = Tools.normalizeStr(cString)
-      val nGramScore: Double = NGram.score(oStringNorm, cStringNorm)
+      val bothEmpty = oStringNorm.isEmpty && cStringNorm.isEmpty
+      val nGramScore: Double = if bothEmpty then 0d else NGram.score(oStringNorm, cStringNorm)
+      val finalScore: Double =
+        if !bothEmpty && nGramScore >= minSimilarity then DiceCoefficient.score(oStringNorm, cStringNorm)
+        else nGramScore
 
-      CompResult("NGramComparator", fieldName, oString, cString, Some(oStringNorm), Some(cStringNorm), nGramScore,
-        nGramScore >= minSimilarity)
+      CompResult("NGramComparator", fieldName, oString, cString, Some(oStringNorm), Some(cStringNorm), finalScore,
+        !bothEmpty && nGramScore >= minSimilarity && finalScore >= minSimilarity)
     else
-      val nGramScore: Double = NGram.score(oString, cString)
+      val bothEmpty = oString.isEmpty && cString.isEmpty
+      val nGramScore: Double = if bothEmpty then 0d else NGram.score(oString, cString)
+      val finalScore: Double =
+        if !bothEmpty && nGramScore >= minSimilarity then DiceCoefficient.score(oString, cString)
+        else nGramScore
 
-      CompResult("NGramComparator", fieldName, oString, cString, None, None, nGramScore, nGramScore >= minSimilarity)
+      CompResult("NGramComparator", fieldName, oString, cString, None, None, finalScore,
+        !bothEmpty && nGramScore >= minSimilarity && finalScore >= minSimilarity)

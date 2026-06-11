@@ -47,7 +47,7 @@ object CSV2Lucene:
    * @param args command-line arguments received by the utility
    * @return result of the complete indexing operation
    */
-  private def run(args: Array[String]): Try[Unit] =
+  def run(args: Array[String]): Try[Unit] =
     for
       parameters <- parseArgs(args)
       _ <- requireParameters(parameters, "csvFile", "index", "schema", "fieldToIndex")

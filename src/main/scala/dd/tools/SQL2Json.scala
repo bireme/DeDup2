@@ -4,7 +4,6 @@ import dd.producers.{MySqlProducerConfig, MysqlProducer}
 
 import java.io.{BufferedWriter, FileWriter}
 import scala.io.Source
-import scala.util.matching.Regex
 import scala.util.{Failure, Success, Try, Using}
 
 /**
@@ -28,11 +27,14 @@ object SQL2Json:
       |	-mySqlUser=<str>        MySQL database user
       |	-mySqlPassword=<str>    MySQL database password
       |	-mySqlDbname=<str>      MySQL database name
-      |	-sqlf=<name>            File having the sql statement
-      |	-outJsonFile=<path>     Path to the output Json File
-      |	[-jsonFieldFile=<path>] Path to the configuration Json file that has in each line the pattern:  <column name>=<json field name>-><new json field name>
-      |	                        If the <json field name> does not exist in a record or the content is an json array the resultant field name will be <column name>
-      |	[-sqlEncoding=<str>]    The sql file character encoding. Default is 'utf-8'""".stripMargin
+      |	-sqlfs=<name1>[,...,<nameN>] Comma-separated SQL statement files to execute sequentially.
+      |	                        Results from each file are appended to the same output JSON array during this run.
+      |	-outJsonFile=<path>     Path to the output JSON file
+      |	[-jsonFieldFile=<path>] Path to a text file with JSON field mappings, one per line, using: <column name>=<json field name>[-><new field name>]
+      |	                        For mapped SQL columns, object fields are extracted from the JSON content and emitted with the configured new field names.
+      |	                        When <new field name> is omitted, the SQL column name is used as the output field name.
+      |	                        Missing JSON fields are ignored. JSON array values are grouped with '//@//'; arrays of non-objects keep the SQL column name.
+      |	[-sqlEncoding=<str>]    SQL file character encoding. Default is 'utf-8'""".stripMargin
 
   /**
    * Entry point used when the utility is executed from the command line.
@@ -54,22 +56,23 @@ object SQL2Json:
   private def run(args: Array[String]): Try[Unit] =
     for
       parameters <- parseArgs(args)
-      _ <- requireParameters(parameters, "mySqlHost", "mySqlPort", "mySqlUser", "mySqlPassword", "mySqlDbname", "sqlf", "outJsonFile")
+      _ <- requireParameters(parameters, "mySqlHost", "mySqlPort", "mySqlUser", "mySqlPassword", "mySqlDbname", "sqlfs", "outJsonFile")
       _ = logParameters(parameters)
       jFields <- parseJsonFieldMapping(parameters.get("jsonFieldFile"))
+      sqlFiles <- Tools.parseSqlFileList(parameters("sqlfs"))
       conf = MySqlProducerConfig(
         mySqlHost = parameters("mySqlHost"),
         mySqlPort = parameters("mySqlPort").toInt,
         mySqlDbname = parameters("mySqlDbname"),
         mySqlUser = parameters("mySqlUser"),
         mySqlPassword = parameters("mySqlPassword"),
-        sqlf = parameters("sqlf"),
+        sqlfs = sqlFiles,
         sqlEncoding = parameters.getOrElse("sqlEncoding", "utf-8"),
         jsonFields = jFields,
         repetitiveFields = None,
         repetitiveSep = None
       )
-      _ <- exportRecords(conf, parameters("outJsonFile"))
+      _ <- exportRecords(conf, sqlFiles, parameters("outJsonFile"))
     yield ()
 
   /**
@@ -118,17 +121,14 @@ object SQL2Json:
   private def parseJsonFieldMapping(jsonFieldFile: Option[String]): Try[Option[Map[String, Map[String, String]]]] =
     jsonFieldFile.fold[Try[Option[Map[String, Map[String, String]]]]](Success(None)):
       jFile =>
-        val regex: Regex = " *([^=]+)= *(.+?)-> *([^$]+)".r
         Using(Source.fromFile(jFile)):
           _.getLines().foldLeft(Map.empty[String, Map[String, String]]):
             case (map, line) =>
-              line.trim match
-                case regex(colName, jsonName, newJsonName) =>
-                  val normalizedColumn = colName.trim
-                  val jsonMapping = map.getOrElse(normalizedColumn, Map.empty) + (jsonName.trim -> newJsonName.trim)
-                  map + (normalizedColumn -> jsonMapping)
-                case "" => map
-                case _ => throw IllegalArgumentException(line)
+              MysqlProducer.parseJsonFieldMappingLine(line) match
+                case Some((colName, jsonName, newJsonName)) =>
+                  val jsonMapping = map.getOrElse(colName, Map.empty) + (jsonName -> newJsonName)
+                  map + (colName -> jsonMapping)
+                case None => map
         .map(Some(_))
 
   /**
@@ -140,14 +140,28 @@ object SQL2Json:
    */
   def exportRecords(conf: MySqlProducerConfig,
                     outJsonFile: String): Try[Unit] =
+    exportRecords(conf, conf.sqlfs, outJsonFile)
+
+  /**
+   * Exports records selected by multiple SQL files to one JSON array file.
+   *
+   * @param conf base database configuration used during export
+   * @param sqlFiles SQL files executed sequentially
+   * @param outJsonFile destination JSON file path
+   * @return result of exporting the records
+   */
+  def exportRecords(conf: MySqlProducerConfig,
+                    sqlFiles: Seq[String],
+                    outJsonFile: String): Try[Unit] =
     Try:
-      val producer: MysqlProducer = new MysqlProducer(conf)
       val writer: BufferedWriter = new BufferedWriter(new FileWriter(outJsonFile))
 
       writer.write("[")
 
-      producer.getDocuments.foldLeft(0):
-        case (current, document) =>
+      var current: Int = 0
+      val producer: MysqlProducer = new MysqlProducer(conf.copy(sqlfs = sqlFiles))
+      producer.getDocuments.foreach:
+        document =>
           if current % 1000 == 0 then println(s"+++$current")
           Try(Tools.doc2json(document)) match
             case Success(json) =>
@@ -156,7 +170,7 @@ object SQL2Json:
               writer.write(json.toString())
             case Failure(exception) =>
               System.err.println(s"Invalid document to json convertion. Document=$document Message=${exception.toString}")
-          current + 1
+          current += 1
 
       writer.newLine()
       writer.write("]")

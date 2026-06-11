@@ -38,14 +38,16 @@ class RegexComparator(fieldName: String,
       val cStringNorm: String = Tools.normalizeStr(cString)
       val oResult: String = re.replaceAllIn(oStringNorm, compString)
       val cResult: String = re.replaceAllIn(cStringNorm, compString)
-      val similar: Boolean = oResult.equals(cResult)
+      val bothEmpty = oResult.isEmpty && cResult.isEmpty
+      val similar: Boolean = !bothEmpty && oResult.equals(cResult)
 
       CompResult("RegexComparator", fieldName, oString, cString, Some(oResult), Some(cResult), if similar then 1 else 0,
         similar)
     else
       val oResult: String = re.replaceAllIn(oString, compString)
       val cResult: String = re.replaceAllIn(cString, compString)
-      val similar: Boolean = oResult.equals(cResult)
+      val bothEmpty = oResult.isEmpty && cResult.isEmpty
+      val similar: Boolean = !bothEmpty && oResult.equals(cResult)
 
       CompResult("RegexComparator", fieldName, oString, cString, Some(oResult), Some(cResult), if similar then 1 else 0,
         similar)

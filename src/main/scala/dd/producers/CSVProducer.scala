@@ -27,7 +27,7 @@ class CSVProducer(csvFile: String,
   override def getDocuments: LazyList[Document] =
     Try:
       val formatBuilder: CSVFormat.Builder = CSVFormat.Builder.create().setDelimiter(fieldSeparator).setTrim(true)
-        .setSkipHeaderRecord(hasHeader).setIgnoreEmptyLines(true).setQuote(null)
+        .setSkipHeaderRecord(hasHeader).setIgnoreEmptyLines(true)
       val reader: InputStreamReader = Source.fromFile(csvFile, csvFileEncoding).reader()
       val parser: CSVParser = CSVParser.builder().setFormat(formatBuilder.get()).setReader(reader).get()
       val records: Iterator[CSVRecord] =
@@ -53,7 +53,8 @@ class CSVProducer(csvFile: String,
                                schema: Map[Int,String],
                                iterator: Iterator[CSVRecord]): LazyList[Document] =
     nextDocument(schema, iterator) match
-      case Some(document) => document #:: getDocumentsLazy(parser, schema, iterator)
+      case Some(document) =>
+        document #:: getDocumentsLazy(parser, schema, iterator)
       case None =>
         closeParser(parser)
         LazyList.empty
