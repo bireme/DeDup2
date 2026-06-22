@@ -9,8 +9,10 @@ export PATH=$JAVA_HOME/bin:$PATH
 
 cd /home/javaapps/sbt-projects/DeDup2 || exit
 
-. /bases/fiadmin2/exec/settings/dedup.inc
+if [ -f /bases/fiadmin2/exec/settings/dedup.inc ]; then
+  . /bases/fiadmin2/exec/settings/dedup.inc
+fi
 
-bin/MySQL2Pipe.sh -host=$mysqlserver -port=$mysqlport -user=$servername -pswd=$serverpassword -dbnm=$serverdatabase -sqls=/home/javaapps/sbt-projects/DCDup/sql/DIREV.sql -pipe=DIREV.pipe
+bin/MySQL2CSV.sh -mySqlHost=$mysqlserver -mySqlPort=$mysqlport -mySqlUser=$servername -mySqlPassword=$serverpassword -mySqlDbname=$serverdatabase -sqlfs=sqls/LILACS_MNT.sql,sqls/LILACS_MNT_ingles.sql -outCsvFile=csv/lilacs_MNT.csv -jsonFieldFile=conf/jsonFields.txt
 
 cd - || exit

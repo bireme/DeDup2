@@ -6,12 +6,10 @@ import org.apache.lucene.analysis.{Analyzer, TokenStream, Tokenizer}
 /**
  * Lucene analyzer that builds normalized n-gram token streams.
  *
- * Depending on the search mode, the analyzer either uses the custom tokenizer
- * optimized for querying or Lucene's standard n-gram tokenizer for indexing,
- * always applying the shared normalization filter afterward.
+ * The analyzer uses Lucene's standard n-gram tokenizer and always applies the
+ * shared normalization filter afterward.
  */
-class NGAnalyzer(ngramSize: Int = 3,
-                 search: Boolean = false) extends Analyzer:
+class NGAnalyzer(ngramSize: Int = 3) extends Analyzer:
   require (this.ngramSize >= 1)
 
   /**
@@ -28,8 +26,7 @@ class NGAnalyzer(ngramSize: Int = 3,
    * @return token stream components for the given field
    */
   def createComponents(fieldName: String): Analyzer.TokenStreamComponents =
-    val tokenizer: Tokenizer = if search then new NGTokenizer(ngramSize) // generate side by size ngrams // current version
-                            else new NGramTokenizer(ngramSize, ngramSize) // generate all ngrams
+    val tokenizer: Tokenizer = new NGramTokenizer(ngramSize, ngramSize)
     val tokenStream: TokenStream = new NormalizeCharFilter(tokenizer)
 
     new Analyzer.TokenStreamComponents(tokenizer, tokenStream)

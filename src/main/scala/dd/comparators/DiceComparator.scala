@@ -11,9 +11,9 @@ import dd.tools.Tools
  * optionally normalizes the resulting strings, and computes a similarity score
  * using the Dice coefficient to decide whether the documents should match.
  */
-class DiceComparator(fieldName: String,
-                     normalize: Boolean,
-                     minSimilarity: Double) extends Comparator:
+class DiceComparator(val fieldName: String,
+                     val normalize: Boolean,
+                     val minSimilarity: Double) extends Comparator:
   require(minSimilarity <= 1.0)
 
   val fieldSeparator: String = "¦"
@@ -31,18 +31,10 @@ class DiceComparator(fieldName: String,
     val cFields: Seq[String] = currentDoc.fields.filter(_._1.equals(fieldName)).map(_._2)
     val oString: String = oFields.map(_.trim).mkString(fieldSeparator)
     val cString: String = cFields.map(_.trim).mkString(fieldSeparator)
-
-    if normalize then
-      val oStringNorm: String = Tools.normalizeStr(oString)
-      val cStringNorm: String = Tools.normalizeStr(cString)
-      val bothEmpty = oStringNorm.isEmpty && cStringNorm.isEmpty
-      val diceCoefficient: Double = if bothEmpty then 0d else DiceCoefficient.score(oStringNorm, cStringNorm)
-
-      CompResult("DiceComparator", fieldName, oString, cString, Some(oStringNorm), Some(cStringNorm), diceCoefficient,
-        !bothEmpty && diceCoefficient >= minSimilarity)
-    else
-      val bothEmpty = oString.isEmpty && cString.isEmpty
-      val diceCoefficient: Double = if bothEmpty then 0d else DiceCoefficient.score(oString, cString)
-
-      CompResult("DiceComparator", fieldName, oString, cString, None, None, diceCoefficient,
-        !bothEmpty && diceCoefficient >= minSimilarity)
+    val oString2: String = if normalize then Tools.normalizeStr(oString) else oString
+    val cString2: String = if normalize then Tools.normalizeStr(cString) else cString
+    val bothEmpty = oString2.isEmpty && cString2.isEmpty
+    val diceCoefficient: Double = if bothEmpty then 0d else DiceCoefficient.score(oString2, cString2)
+    
+    CompResult("DiceComparator", fieldName, oString, cString, Some(oString2), Some(cString2), diceCoefficient,
+      !bothEmpty && diceCoefficient >= minSimilarity)

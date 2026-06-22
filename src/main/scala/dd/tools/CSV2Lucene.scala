@@ -55,7 +55,8 @@ object CSV2Lucene:
       schemaContent <- readSchema(parameters("schema").trim)
       schemaMap <- parseSchema(schemaContent)
       fieldToIndex = parameters("fieldToIndex")
-      _ <- if schemaMap.values.exists(_ == fieldToIndex) then Success(()) else Failure(IllegalArgumentException(s"Field to index [$fieldToIndex] is not present in the schema file."))
+      _ <- if schemaMap.values.exists(_ == fieldToIndex) then Success(())
+           else Failure(IllegalArgumentException(s"Field to index [$fieldToIndex] is not present in the schema file."))
       producer = new CSVProducer(
         parameters("csvFile"),
         schemaMap,

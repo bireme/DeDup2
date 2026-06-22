@@ -32,22 +32,12 @@ class RegexComparator(fieldName: String,
     val cFields: Seq[String] = currentDoc.fields.filter(_._1.equals(fieldName)).map(_._2)
     val oString: String = oFields.map(_.trim).mkString(fieldSeparator)
     val cString: String = cFields.map(_.trim).mkString(fieldSeparator)
+    val oString2: String = if normalize then Tools.normalizeStr(oString) else oString
+    val cString2: String = if normalize then Tools.normalizeStr(cString) else cString
+    val oResult: String = re.replaceAllIn(oString2, compString)
+    val cResult: String = re.replaceAllIn(cString2, compString)
+    val bothEmpty: Boolean = oResult.isEmpty && cResult.isEmpty
+    val similar: Boolean = !bothEmpty && oResult.equals(cResult)
 
-    if normalize then
-      val oStringNorm: String = Tools.normalizeStr(oString)
-      val cStringNorm: String = Tools.normalizeStr(cString)
-      val oResult: String = re.replaceAllIn(oStringNorm, compString)
-      val cResult: String = re.replaceAllIn(cStringNorm, compString)
-      val bothEmpty = oResult.isEmpty && cResult.isEmpty
-      val similar: Boolean = !bothEmpty && oResult.equals(cResult)
-
-      CompResult("RegexComparator", fieldName, oString, cString, Some(oResult), Some(cResult), if similar then 1 else 0,
-        similar)
-    else
-      val oResult: String = re.replaceAllIn(oString, compString)
-      val cResult: String = re.replaceAllIn(cString, compString)
-      val bothEmpty = oResult.isEmpty && cResult.isEmpty
-      val similar: Boolean = !bothEmpty && oResult.equals(cResult)
-
-      CompResult("RegexComparator", fieldName, oString, cString, Some(oResult), Some(cResult), if similar then 1 else 0,
-        similar)
+    CompResult("RegexComparator", fieldName, oString, cString, Some(oResult), Some(cResult), if similar then 1 else 0,
+      similar)

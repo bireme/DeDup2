@@ -147,7 +147,7 @@ private[reporters] object LuceneReporter:
       "originalFieldOther" -> result.originalFieldOther.getOrElse(""),
       "currentFieldOther" -> result.currentFieldOther.getOrElse(""),
       "Similarity" -> result.similarity.toString,
-      "isSimilar" -> result.isSimilar.toString
+      "isSimilar" -> ReporterSimilarityStatus.displayValue(result)
     )
 
   /**

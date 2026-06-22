@@ -1,10 +1,13 @@
 package dd
 
+import dd.comparators.DiceComparator
 import dd.configurators.ConfMain
 import dd.configurators.ConfMain.{ConfiguredReporter, SimilarDocsConfig}
 import dd.interfaces.{CompResult, Comparator, DocsFinder, DocsProducer, Document, Reporter}
+import ox.{forkUser, par, supervised}
 
 import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -37,10 +40,13 @@ class SimilarDocs private[dd] (config: SimilarDocsConfig):
     )
 
   private val finder: DocsFinder = config.finder
-  private val filters: Seq[Comparator] = config.comparators
+  private val filters: Seq[Comparator] =
+    SimilarDocs.includeIndexedFieldDiceComparator(config.finder, config.comparators)
   private val reporters: Seq[ConfiguredReporter] = config.reporters
   private val auxQuery: Option[String] = config.auxQuery
   private val maxDocs: Option[Int] = config.maxDocs
+  private val documentParallelism: Int = config.documentParallelism
+  private val reporterLock = new Object
 
   /**
    * Runs the complete similarity workflow for the configured source producer.
@@ -48,15 +54,36 @@ class SimilarDocs private[dd] (config: SimilarDocsConfig):
    * @return result of processing all configured source documents
    */
   def run(): Try[Unit] =
-    closeAfter:
-      config.producer.getDocuments.zipWithIndex.foldLeft(Try(())):
-        case (acc, (document, index)) =>
-          acc.flatMap:
-            _ =>
-              processSimilars(document).map:
-                _ =>
-                  val pos = index + 1
-                  if pos % 100 == 0 then println(s"+++$pos")
+    closeAfter(processDocuments(config.producer.getDocuments))
+
+  private[dd] def processDocuments(
+      docs: LazyList[Document],
+      recoverDocumentError: (Document, Throwable) => Try[Unit] = (_, exception) => Failure(exception)
+  ): Try[Unit] =
+    Try:
+      supervised:
+        val iterator = docs.iterator
+        val iteratorLock = new Object
+        val completed = AtomicInteger(0)
+
+        def nextDocument(): Option[Document] =
+          iteratorLock.synchronized:
+            if iterator.hasNext then Some(iterator.next()) else None
+
+        def processWorker(): Unit =
+          var next = nextDocument()
+          while next.nonEmpty do
+            val document = next.get
+            processSimilars(document).recoverWith:
+              case exception => recoverDocumentError(document, exception)
+            .get
+
+            val pos = completed.incrementAndGet()
+            if pos % 1000 == 0 then println(s"+++$pos")
+            next = nextDocument()
+
+        val workers = (1 to documentParallelism).map(_ => forkUser(processWorker()))
+        workers.foreach(_.join())
 
   /**
    * Processes the similar documents for the given source document.
@@ -117,7 +144,8 @@ class SimilarDocs private[dd] (config: SimilarDocsConfig):
    */
   private def getResults(originalDoc: Document,
                          currentDoc: Document): (Document, Seq[CompResult]) =
-    (currentDoc, filters.map(_.compare(originalDoc, currentDoc)))
+    val results = par(filters.map(comparator => () => comparator.compare(originalDoc, currentDoc)))
+    (currentDoc, results)
 
   /**
    * Sends the comparison results to every configured reporter in sequence.
@@ -130,9 +158,7 @@ class SimilarDocs private[dd] (config: SimilarDocsConfig):
   private def notifyReporters(originalDoc: Document,
                               currentDoc: Document,
                               results: Seq[CompResult]): Try[Unit] =
-    if results.zip(filters).exists:
-      case (result, comparator) => comparator.isGate && result.isSimilar
-    then
+    reporterLock.synchronized:
       reporters.foldLeft(Try(())):
         case (acc, configuredReporter) =>
           acc.flatMap:
@@ -143,7 +169,6 @@ class SimilarDocs private[dd] (config: SimilarDocsConfig):
                 configuredReporter.otherFields,
                 results
               )
-    else Success(())
 
   /**
    * Runs an operation and closes the similarity pipeline afterward.
@@ -238,3 +263,24 @@ object SimilarDocs:
    */
   private[dd] def includeRequiredReportFields(otherFields: Seq[String]): Seq[String] =
     ConfMain.includeRequiredReportFields(otherFields)
+
+  /**
+   * Ensures the Lucene indexed field is also present in reportable comparison
+   * results, without calculating the same Dice comparison twice.
+   *
+   * @param finder configured finder that supplies the indexed field and threshold
+   * @param comparators comparator list parsed from configuration
+   * @return comparator list with one Dice comparator for the indexed field
+   */
+  private[dd] def includeIndexedFieldDiceComparator(finder: DocsFinder,
+                                                   comparators: Seq[Comparator]): Seq[Comparator] =
+    (finder.getSearchField, finder.getMinSimilarity) match
+      case (Some(searchField), Some(minSimilarity)) if !hasDiceComparatorFor(comparators, searchField) =>
+        DiceComparator(searchField, normalize = true, minSimilarity) +: comparators
+      case _ => comparators
+
+  private def hasDiceComparatorFor(comparators: Seq[Comparator],
+                                   fieldName: String): Boolean =
+    comparators.exists:
+      case dice: DiceComparator => dice.fieldName == fieldName
+      case _ => false

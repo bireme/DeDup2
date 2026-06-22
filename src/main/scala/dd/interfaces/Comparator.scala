@@ -4,18 +4,9 @@ package dd.interfaces
  * Contract implemented by document comparators in the deduplication pipeline.
  *
  * A comparator inspects two documents and returns a structured result
- * describing the compared field values, their computed similarity, and the
- * boolean decision used by downstream reporters.
+ * describing the compared field values, their computed similarity.
  */
 abstract class Comparator:
-  /**
-   * Indicates whether this comparator controls whether a document pair may be
-   * sent to reporters.
-   *
-   * @return true when the comparator should act as a reporting gate
-   */
-  def isGate: Boolean = false
-
   /**
    * Compares the input documents and returns the comparison result.
    *

@@ -23,7 +23,8 @@ class MongoDBReporter(database: String,
                       port: Option[Int] = None,
                       user: Option[String] = None,
                       password: Option[String] = None,
-                      minTrue: Int = 0) extends Reporter:
+                      minTrue: Int = 0,
+                      flushResults: Boolean = false) extends Reporter:
   private val usrPswStr: String = user.flatMap:
     usr => password.map(psw => s"$usr:$psw@")
   .getOrElse("")
@@ -91,7 +92,7 @@ class MongoDBReporter(database: String,
     Try:
       buffer.addOne(doc)
     .flatMap:
-      _ => Option.when(buffer.size >= maxSize)(flushBuffer(buffer, coll)).getOrElse(Success(()))
+      _ => Option.when(flushResults || buffer.size >= maxSize)(flushBuffer(buffer, coll)).getOrElse(Success(()))
 
   /**
    * Flushes the buffered MongoDB documents.
@@ -174,4 +175,4 @@ private[reporters] object MongoDBReporter:
       .append("originalFieldOther", result.originalFieldOther.getOrElse(""))
       .append("currentFieldOther", result.currentFieldOther.getOrElse(""))
       .append("similarity", result.similarity)
-      .append("isSimilar", result.isSimilar)
+      .append("isSimilar", ReporterSimilarityStatus.displayValue(result))

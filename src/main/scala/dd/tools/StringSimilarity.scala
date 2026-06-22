@@ -32,8 +32,13 @@ object StringSimilarity:
      * @return Dice coefficient for the provided token arrays
      */
     private def diceCoefficient[T](left: Array[T], right: Array[T]): Double =
-      val leftPairs = left.zip(left.tail).toSet
-      val rightPairs = right.zip(right.tail).toSet
+      val leftPairs =
+        if left.length < 2 then Set.empty[(T, T)]
+        else left.zip(left.tail).toSet
+
+      val rightPairs =
+        if right.length < 2 then Set.empty[(T, T)]
+        else right.zip(right.tail).toSet
 
       if leftPairs.isEmpty && rightPairs.isEmpty then
         if left.sameElements(right) then 1.0 else 0.0

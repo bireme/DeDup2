@@ -137,7 +137,7 @@ class PipeReporter(writer: Writer,
                                  currentDoc: Document,
                                  otherFields: Seq[String],
                                  results: Seq[CompResult]): Try[Unit] = {
-    if results.count(_.isSimilar) >= minTrue then println(s"isSimilar count=${results.count(_.isSimilar)} min=$minTrue")
+    // if results.count(_.isSimilar) >= minTrue then println(s"isSimilar count=${results.count(_.isSimilar)} min=$minTrue")
     if results.count(_.isSimilar) < minTrue then Try(())
     else
       val serialized: Seq[String] = serializeRow(originalDoc, currentDoc, otherFields, results)
@@ -179,7 +179,7 @@ class PipeReporter(writer: Writer,
       result.currentField,
       result.originalFieldOther.getOrElse(""),
       result.currentFieldOther.getOrElse(""),
-      result.similarity.toString, result.isSimilar.toString)
+      result.similarity.toString, ReporterSimilarityStatus.displayValue(result))
 
   /**
    * Converts empty output cells to the textual null marker.

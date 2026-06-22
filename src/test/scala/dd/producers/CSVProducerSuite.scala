@@ -17,7 +17,7 @@ class CSVProducerSuite extends munit.FunSuite:
     )
 
     val producer = new CSVProducer(
-      csvFile = csvFile.toString,
+      csv = csvFile.toString,
       schema = Map(0 -> "id", 1 -> "title"),
       hasHeader = true
     )
@@ -39,7 +39,7 @@ class CSVProducerSuite extends munit.FunSuite:
     )
 
     val producer = new CSVProducer(
-      csvFile = csvFile.toString,
+      csv = csvFile.toString,
       schema = Map(0 -> "id", 1 -> "title"),
       hasHeader = true
     )
@@ -48,3 +48,15 @@ class CSVProducerSuite extends munit.FunSuite:
 
     assertEquals(documents.size, 1)
     assertEquals(documents.head.fields, Seq("id" -> "1", "title" -> "Title with comma, and \"quotes\""))
+
+  test("CSVProducer reads direct CSV content"):
+    val producer = new CSVProducer(
+      csv = "id,title\n1,\"Inline title, with comma\"\n",
+      schema = Map(0 -> "id", 1 -> "title"),
+      hasHeader = true
+    )
+
+    val documents = producer.getDocuments.toList
+
+    assertEquals(documents.size, 1)
+    assertEquals(documents.head.fields, Seq("id" -> "1", "title" -> "Inline title, with comma"))

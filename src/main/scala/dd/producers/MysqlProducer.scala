@@ -36,10 +36,17 @@ case class MySqlProducerConfig(mySqlHost: String,
 
   def sqlf: String = sqlfs.mkString(",")
 
+/**
+ * Companion object for `MysqlProducer`.
+ *
+ * It contains shared type aliases, constants, and helper methods used to parse
+ * JSON field mappings and expand SQL row values into document field variants.
+ */
 object MysqlProducer:
   private[producers] type FieldEntries = Seq[(String, String)]
   private[producers] type FieldVariants = Seq[FieldEntries]
   private val JsonArrayValueSeparator: String = "//@//"
+  private val MysqlStreamingFetchSize: Int = Integer.MIN_VALUE
 
   /**
    * Parses one jsonFieldFile mapping line.
@@ -150,6 +157,9 @@ object MysqlProducer:
  * The producer executes the configured SQL query, converts each result row into
  * one or more internal documents, and expands JSON or repetitive fields when
  * the corresponding configuration options are present.
+ *
+ * @param conf MySQL connection, SQL source, encoding, JSON field, and
+ *             repetitive field settings used by this producer
  */
 class MysqlProducer(conf: MySqlProducerConfig) extends DocsProducer:
   import MysqlProducer.{FieldEntries, FieldVariants}
@@ -176,13 +186,15 @@ class MysqlProducer(conf: MySqlProducerConfig) extends DocsProducer:
    */
   private def documentsFromSqlFile(sqlFile: String): LazyList[Document] =
     val con: Connection = DriverManager.getConnection(url, conf.mySqlUser, conf.mySqlPassword)
-    val statement: Statement = con.createStatement()
+    con.setReadOnly(true)
+    val statement: Statement = con.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)
+    statement.setFetchSize(MysqlProducer.MysqlStreamingFetchSize)
     val reader: BufferedSource = Source.fromFile(sqlFile)(using Codec(decoder))
     val content: String =
       try reader.getLines().mkString(" ")
       finally reader.close()
 
-    print(s"Executing query $sqlFile ... ")
+    print(s"Executing query file: $sqlFile ... ")
     val rs: ResultSet = statement.executeQuery(content)
     println("OK")
 
@@ -215,6 +227,7 @@ class MysqlProducer(conf: MySqlProducerConfig) extends DocsProducer:
               /*con.close()
               LazyList.empty*/
         else
+          rs.close()
           statement.close()
           con.close()
           LazyList.empty

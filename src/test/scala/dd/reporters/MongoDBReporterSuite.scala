@@ -24,7 +24,7 @@ class MongoDBReporterSuite extends munit.FunSuite:
     assertEquals(document.getString("originalFieldOther"), "originaltitle")
     assertEquals(document.getString("currentFieldOther"), "currenttitle")
     assertEquals(document.getDouble("similarity").doubleValue(), 0.75)
-    assertEquals(document.getBoolean("isSimilar").booleanValue(), true)
+    assertEquals(document.getString("isSimilar"), "true")
 
   test("resultFieldFor appends wildcard suffix when either compared field is empty"):
     val result = CompResult(
@@ -43,6 +43,7 @@ class MongoDBReporterSuite extends munit.FunSuite:
     assertEquals(fieldName, "title_*")
     assertEquals(document.getString("originalField"), "")
     assertEquals(document.getString("currentField"), "")
+    assertEquals(document.getString("isSimilar"), "maybe")
 
     val (fieldNameWithOnlyCurrentEmpty, _) = MongoDBReporter.resultFieldFor(
       result.copy(originalField = "Original Title")

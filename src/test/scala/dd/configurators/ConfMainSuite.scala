@@ -104,6 +104,54 @@ class ConfMainSuite extends munit.FunSuite:
     parsed._1.close().get
     parsed._3.foreach(_.close().get)
 
+  test("parseSimilarDocsConfig reads document parallelism"):
+    val indexDir = Files.createTempDirectory("dedup2-confmain-parallel-index")
+    val reportFile = Files.createTempFile("dedup2-confmain-parallel-report", ".csv")
+    val configFile = Files.createTempFile("dedup2-confmain-parallel", ".json")
+    val csvFile = Files.createTempFile("dedup2-confmain-parallel", ".csv")
+    val schemaFile = Files.createTempFile("dedup2-confmain-parallel-schema", ".txt")
+
+    val producer = new DocsProducer:
+      override def getDocuments: LazyList[Document] =
+        LazyList(Document(Seq("title" -> "sample", "id" -> "1")))
+
+    Tools.createLuceneIndex(producer, indexDir.toString, "title", new NGAnalyzer()).get
+    Files.writeString(csvFile, "dbase,id,title\nLILACS,1,sample\n", StandardCharsets.UTF_8)
+    Files.writeString(schemaFile, "0=dbase,1=id,2=title", StandardCharsets.UTF_8)
+
+    val config =
+      s"""{
+         |  "documentParallelism": 3,
+         |  "producer": {
+         |    "csv": {
+         |      "file": "${escape(csvFile.toString)}",
+         |      "schema": "file=${escape(schemaFile.toString)}",
+         |      "hasHeader": true
+         |    }
+         |  },
+         |  "finder": {
+         |    "lucene": {
+         |      "index": "${escape(indexDir.toString)}",
+         |      "searchField": "title",
+         |      "minSimilarity": 0.8
+         |    }
+         |  },
+         |  "comparators": [
+         |    { "exact": { "fieldName": "title", "normalize": true } }
+         |  ],
+         |  "reporters": [
+         |    { "pipe": { "file": "${escape(reportFile.toString)}", "encoding": "UTF-8", "recordSeparator": "|", "putHeader": true } }
+         |  ]
+         |}""".stripMargin
+
+    Files.writeString(configFile, config, StandardCharsets.UTF_8)
+
+    val parsed = ConfMain.parseSimilarDocsConfig(configFile.toFile).get
+
+    assertEquals(parsed.documentParallelism, 3)
+    parsed.finder.close().get
+    parsed.reporters.foreach(_.reporter.close().get)
+
   test("parseConfig accepts Lucene reporter with field name mapping"):
     val sourceIndexDir = Files.createTempDirectory("dedup2-confmain-lucene-source")
     val reportIndexDir = Files.createTempDirectory("dedup2-confmain-lucene-report")
@@ -282,6 +330,45 @@ class ConfMainSuite extends munit.FunSuite:
     assertEquals(parsed.comparators.size, 1)
     assertEquals(parsed.reporters.size, 1)
     assertEquals(parsed.reporters.head.otherFields, Seq("dbase", "id", "title"))
+
+    parsed.reporters.foreach(_.reporter.close().get)
+
+  test("parseSelfCheckDuplicatedConfig creates parent directories for pipe reporter files"):
+    val baseDir = Files.createTempDirectory("dedup2-selfcheck-report-parent")
+    val reportFile = baseDir.resolve("missing").resolve("report.txt")
+    val configFile = Files.createTempFile("dedup2-selfcheck-missing-parent", ".json")
+
+    val config =
+      s"""{
+         |  "producer": {
+         |    "csv": {
+         |      "file": "ignored.csv",
+         |      "schema": "0=dbase,1=id,2=title",
+         |      "hasHeader": true,
+         |      "fieldSeparator": ";"
+         |    }
+         |  },
+         |  "finder": {
+         |    "lucene": {
+         |      "index": "ignored-by-self-check",
+         |      "searchField": "title",
+         |      "minSimilarity": 0.8
+         |    }
+         |  },
+         |  "comparators": [
+         |    { "exact": { "fieldName": "title", "normalize": true } }
+         |  ],
+         |  "reporters": [
+         |    { "pipe": { "file": "${escape(reportFile.toString)}", "encoding": "UTF-8", "recordSeparator": "|", "putHeader": true } }
+         |  ]
+         |}""".stripMargin
+
+    Files.writeString(configFile, config, StandardCharsets.UTF_8)
+
+    val parsed = ConfMain.parseSelfCheckDuplicatedConfig(configFile.toFile).get
+
+    assert(Files.isDirectory(reportFile.getParent))
+    assert(Files.exists(reportFile))
 
     parsed.reporters.foreach(_.reporter.close().get)
 

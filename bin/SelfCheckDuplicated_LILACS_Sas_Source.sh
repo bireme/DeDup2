@@ -9,9 +9,7 @@ export PATH=$JAVA_HOME/bin:$PATH
 
 cd /home/javaapps/sbt-projects/DeDup2/ || exit
 
-bin/GenSasSourcePipe.sh
-mv ./lilacs_Sas_Source.pipe selfCheck/LILACS_Sas_Source/
-bin/SelfCheckDuplicated.sh -pipe=selfCheck/LILACS_Sas_Source/lilacs_Sas_Source.pipe -schema=schemas/configLILACS_Sas_Source.cfg -outDupFile=selfCheck/LILACS_Sas_Source/dup.pip -outNoDupFile=selfCheck/LILACS_Sas_Source/nodup.pip -pipeEncoding=utf-8
+bin/SelfCheckDuplicated.sh conf/LILACS_Sas_Source_Four_self.cfg
 
 cd -|| exit
 

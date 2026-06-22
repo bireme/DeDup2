@@ -3,8 +3,8 @@ package dd.configurators
 import dd.comparators.{AuthorsComparator, DiceComparator, ExactComparator, NGramComparator, RegexComparator}
 import dd.finders.LuceneDocsFinder
 import dd.interfaces.{Comparator, DocsFinder, DocsProducer, Reporter}
-import dd.producers.{CSVProducer, MongoDBProducer, MongoDBProducerConfig, MySqlProducerConfig, MysqlProducer}
-import dd.reporters.{LuceneReporter, MongoDBReporter, PipeReporter}
+import dd.producers.{CSVProducer, JsonProducer, MongoDBProducer, MongoDBProducerConfig, MySqlProducerConfig, MysqlProducer}
+import dd.reporters.{JsonReporter, LuceneReporter, MongoDBReporter, PipeReporter}
 import play.api.libs.json.{JsArray, JsLookupResult, JsObject, JsValue, Json}
 
 import java.io.{BufferedWriter, File}
@@ -39,13 +39,15 @@ object ConfMain:
    * @param reporters reporters notified for accepted comparison results
    * @param auxQuery optional auxiliary query passed to the finder
    * @param maxDocs optional maximum number of candidate documents per source document
+   * @param documentParallelism maximum number of source documents processed concurrently
    */
   case class SimilarDocsConfig(producer: DocsProducer,
                                finder: DocsFinder,
                                comparators: Seq[Comparator],
                                reporters: Seq[ConfiguredReporter],
                                auxQuery: Option[String],
-                               maxDocs: Option[Int])
+                               maxDocs: Option[Int],
+                               documentParallelism: Int = Runtime.getRuntime.availableProcessors().max(1))
 
   /**
    * Parsed CSV producer settings that can be reused without instantiating a producer.
@@ -91,6 +93,7 @@ object ConfMain:
    * @param reporters reporters notified for accepted comparison results
    * @param auxQuery optional auxiliary query passed to the finder
    * @param maxDocs optional maximum number of candidate documents per source document
+   * @param documentParallelism maximum number of source documents processed concurrently
    * @param csvEncoding encoding used for CSV generated from MySQL sources
    * @param outCsvFile optional CSV output path for MySQL sources
    * @param index optional Lucene index path for the generated self-check index
@@ -102,6 +105,7 @@ object ConfMain:
                                        reporters: Seq[ConfiguredReporter],
                                        auxQuery: Option[String],
                                        maxDocs: Option[Int],
+                                       documentParallelism: Int,
                                        csvEncoding: String,
                                        outCsvFile: Option[String],
                                        index: Option[String])
@@ -215,7 +219,8 @@ object ConfMain:
       comparators = comparators,
       reporters = reporters,
       auxQuery = (lucene \ "auxQuery").asOpt[String].filter(_.nonEmpty),
-      maxDocs = (lucene \ "maxDocs").asOpt[Int]
+      maxDocs = (lucene \ "maxDocs").asOpt[Int],
+      documentParallelism = parseDocumentParallelism(json)
     )
 
   /**
@@ -256,6 +261,7 @@ object ConfMain:
       reporters = reporters,
       auxQuery = (lucene \ "auxQuery").asOpt[String].filter(_.nonEmpty),
       maxDocs = (lucene \ "maxDocs").asOpt[Int],
+      documentParallelism = parseDocumentParallelism(json),
       csvEncoding = (selfCheck \ "encoding").asOpt[String].filter(_.nonEmpty).getOrElse("utf-8"),
       outCsvFile = (selfCheck \ "outCsvFile").asOpt[String].filter(_.nonEmpty),
       index = (selfCheck \ "index").asOpt[String].filter(_.nonEmpty)
@@ -293,6 +299,7 @@ object ConfMain:
                             jsonStr: String): DocsProducer =
     val map = json.value
     if map.contains("csv") then parseCSVProducer(map("csv").as[JsObject])
+    else if map.contains("json") then parseJsonProducer(map("json").as[JsObject])
     else if map.contains("mysql") then parseMysqlProducer(map("mysql").as[JsObject])
     else if map.contains("mongoDB") then parseMongoDBProducer(map("mongoDB").as[JsObject])
     else if map.contains("mongodb") then parseMongoDBProducer(map("mongodb").as[JsObject])
@@ -307,7 +314,7 @@ object ConfMain:
   private def parseCSVProducer(json: JsObject): CSVProducer =
     val config = parseCSVProducerConfig(json)
     new CSVProducer(
-      csvFile = config.csvFile,
+      csv = config.csvFile,
       schema = config.schema,
       hasHeader = config.hasHeader,
       fieldSeparator = config.fieldSeparator,
@@ -337,6 +344,23 @@ object ConfMain:
         .orElse(optionalString(map, "fieldSep"))
         .flatMap(_.headOption)
         .getOrElse(','),
+      encoding = optionalString(map, "encoding").getOrElse("utf-8")
+    )
+
+  /**
+   * Parses the JSON source producer configuration.
+   *
+   * @param json JSON object containing the JSON producer configuration
+   * @return configured JSON producer
+   */
+  private def parseJsonProducer(json: JsObject): JsonProducer =
+    val map: collection.Map[String, JsValue] = json.value
+    new JsonProducer(
+      input = optionalString(map, "input")
+        .orElse(optionalString(map, "file"))
+        .orElse(optionalString(map, "json"))
+        .getOrElse(throw new IllegalArgumentException("Missing 'input'")),
+      fields = optionalStringSeq(map, "fields"),
       encoding = optionalString(map, "encoding").getOrElse("utf-8")
     )
 
@@ -438,6 +462,14 @@ object ConfMain:
       throw new IllegalArgumentException("'finder/lucene/minSimilarity' must be between 0.0 and 1.0")
     value
 
+  private def parseDocumentParallelism(json: JsValue): Int =
+    val default = Runtime.getRuntime.availableProcessors().max(1)
+    val value = (json \ "documentParallelism").asOpt[Int]
+      .orElse((json \ "parallelism").asOpt[Int])
+      .getOrElse(default)
+    if value <= 0 then throw new IllegalArgumentException("'documentParallelism' must be greater than zero")
+    value
+
   /**
    * Parses the configured comparators.
    *
@@ -497,6 +529,9 @@ object ConfMain:
     if map.contains("pipe") then
       val json = map("pipe").as[JsObject]
       ConfiguredReporter(parsePipeReporter(json), parseOtherFields(json))
+    else if map.contains("json") then
+      val json = map("json").as[JsObject]
+      ConfiguredReporter(parseJsonReporter(json), parseOtherFields(json))
     else if map.contains("mongoDB") then
       val json = map("mongoDB").as[JsObject]
       ConfiguredReporter(parseMongoDBReporter(json), parseOtherFields(json))
@@ -570,11 +605,31 @@ object ConfMain:
   private def parsePipeReporter(json: JsObject): PipeReporter =
     val map: collection.Map[String, JsValue] = json.value
     val encoding: String = requiredString(map, "encoding")
-    val writer: BufferedWriter = Files.newBufferedWriter(new File(requiredString(map, "file")).toPath,
+    val writer: BufferedWriter = Files.newBufferedWriter(prepareOutputFile(requiredString(map, "file")),
       Charset.forName(encoding), StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)
     val minTrue: Int = map.get("minTrue").flatMap(_.asOpt[Int]).getOrElse(0)
     val flushResults: Boolean = map.get("flushResults").flatMap(_.asOpt[Boolean]).getOrElse(false)
     new PipeReporter(writer, pipeRecordSeparator(map), requiredBoolean(map, "putHeader"), minTrue, flushResults)
+
+  /**
+   * Parses the JSON reporter configuration.
+   *
+   * @param json JSON object containing the selected configuration block
+   * @return configured JSON reporter
+   */
+  private def parseJsonReporter(json: JsObject): JsonReporter =
+    val map: collection.Map[String, JsValue] = json.value
+    val encoding: String = requiredString(map, "encoding")
+    val writer: BufferedWriter = Files.newBufferedWriter(prepareOutputFile(requiredString(map, "file")),
+      Charset.forName(encoding), StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)
+    val minTrue: Int = map.get("minTrue").flatMap(_.asOpt[Int]).getOrElse(0)
+    val flushResults: Boolean = map.get("flushResults").flatMap(_.asOpt[Boolean]).getOrElse(false)
+    new JsonReporter(writer, minTrue, flushResults)
+
+  private def prepareOutputFile(fileName: String): java.nio.file.Path =
+    val path = new File(fileName).toPath
+    Option(path.getParent).foreach(parent => Files.createDirectories(parent))
+    path
 
   /**
    * Parses the MongoDB reporter configuration.
@@ -592,7 +647,8 @@ object ConfMain:
       port = map.get("port").flatMap(_.asOpt[Int]),
       user = map.get("user").flatMap(_.asOpt[String]),
       password = map.get("password").flatMap(_.asOpt[String]),
-      minTrue = map.get("minTrue").flatMap(_.asOpt[Int]).getOrElse(0)
+      minTrue = map.get("minTrue").flatMap(_.asOpt[Int]).getOrElse(0),
+      flushResults = map.get("flushResults").flatMap(_.asOpt[Boolean]).getOrElse(false)
     )
 
   /**
