@@ -1,0 +1,1 @@
+select  id,conference_date,conference_normalized_date from biblioref_referencecomplement

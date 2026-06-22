@@ -65,9 +65,9 @@ object SelfCheckDuplicated:
       config <- ConfMain.parseSelfCheckDuplicatedConfig(configFile)
       index <- outputIndex(config)
       source <- prepareSource(config)
-      _ = println(s"Generating Lucene index: $index")
+      _ = print(s"Generating Lucene index: $index ... ")
       _ <- CSV2Lucene.run(csv2LuceneArgs(config, source, index))
-      _ = println("Index generated.")
+      _ = println("OK")
       csvProducer = new CSVProducer(
         source.csvFile,
         source.schema,
@@ -77,20 +77,15 @@ object SelfCheckDuplicated:
       )
       _ = print("Generating similar documents ... ")
       similarDocs = createSimilarDocs(config, index)
-      _ = println("OK")
       _ <- closeAfter(similarDocs):
-        csvProducer.getDocuments.zipWithIndex.foldLeft(Try(())):
-          case (acc, (document, index)) =>
-            acc.flatMap:
-              _ =>
-                similarDocs.processSimilars(document).recover:
-                  case ex =>
-                    Console.err.println(s"Processing similars error. msg=${ex.toString} doc=${document.toString}")
-                    ex.printStackTrace()
-                    System.exit(1)
-                val pos = index + 1
-                if pos % 100 == 0 then println(s"+++$pos")
-                Success(())
+        similarDocs.processDocuments(
+          csvProducer.getDocuments,
+          (document, ex) =>
+            Console.err.println(s"Processing similars error. msg=${ex.toString} doc=${document.toString}")
+            ex.printStackTrace()
+            Success(())
+        )
+      _ = println("OK")
     yield ()
 
   /**
@@ -141,8 +136,9 @@ object SelfCheckDuplicated:
       case SelfCheckMysqlSourceConfig(mysql) =>
         for
           csvFile <- outputCsvFile(config)
-          _ = println(s"Generating CSV file: $csvFile")
+          _ = println(s"Generating CSV file: $csvFile...")
           _ <- SQL2CSV.exportRecords(mysql, csvFile)
+          _ = println("CSV File generated.")
           schema <- schemaFromCsvHeader(csvFile, config.csvEncoding)
           _ <- SimilarDocs.requireSchemaFields(schema)
         yield PreparedCsvSource(
@@ -274,7 +270,8 @@ object SelfCheckDuplicated:
           configured =>
             ConfiguredReporter(SelfPairSkippingReporter(configured.reporter), configured.otherFields),
         auxQuery = config.auxQuery,
-        maxDocs = config.maxDocs
+        maxDocs = config.maxDocs,
+        documentParallelism = config.documentParallelism
       )
     )
 

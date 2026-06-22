@@ -9,19 +9,6 @@ export PATH=$JAVA_HOME/bin:$PATH
 
 cd /home/javaapps/sbt-projects/DeDup2/ || exit
 
-. /bases/fiadmin2/exec/settings/dedup.inc
-
-bin/SelfCheckDuplicated.sh 
--mySqlHost=$mysqlserver 
--mySqlPort=$mysqlport
--mySqlUser=$servername
--mySqlPassword=$serverpassword 
--mySqlDbname=$serverdatabase 
--sqlf=sql/DIREV.sql 
--schema=schemas/configDIREV_Three.cfg 
--fieldToIndex= 
--confFile= 
--mongoDatabase=DeDup2 
--mongoCollection=DIREV
+bin/SelfCheckDuplicated.sh conf/DIREV_Three_self.cfg
 
 cd -|| exit

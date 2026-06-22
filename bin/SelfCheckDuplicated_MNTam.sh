@@ -9,9 +9,7 @@ export PATH=$JAVA_HOME/bin:$PATH
 
 cd /home/javaapps/sbt-projects/DeDup2/ || exit
 
-bin/GenMNTamPipe.sh
-mv ./lilacs_MNTam.pipe selfCheck/LILACS_MNTam/ 
-bin/SelfCheckDuplicated.sh -pipe=selfCheck/LILACS_MNTam/lilacs_MNTam.pipe -schema=schemas/configLILACS_MNTam_Five.cfg -outDupFile=selfCheck/LILACS_MNTam/dup.pip -outNoDupFile=selfCheck/LILACS_MNTam/nodup.pip -pipeEncoding=utf-8
+bin/SelfCheckDuplicated.sh conf/LILACS_MNTam_Five_self.cfg
 
 cd -|| exit
 

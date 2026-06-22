@@ -9,9 +9,7 @@ export PATH=$JAVA_HOME/bin:$PATH
 
 cd /home/javaapps/sbt-projects/DeDup2/ || exit
 
-bin/GenMNTPipe.sh
-mv ./lilacs_MNT.pipe selfCheck/LILACS_MNT/ 
-bin/SelfCheckDuplicated.sh -pipe=selfCheck/LILACS_MNT/lilacs_MNT.pipe -schema=schemas/configLILACS_MNT_Four.cfg -outDupFile=selfCheck/LILACS_MNT/dup.pip -outNoDupFile=selfCheck/LILACS_MNT/nodup.pip -pipeEncoding=utf-8
+bin/SelfCheckDuplicated.sh conf/LILACS_MNT_Four_self.cfg
 
 cd -|| exit
 

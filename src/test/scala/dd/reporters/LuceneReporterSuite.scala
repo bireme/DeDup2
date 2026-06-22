@@ -53,7 +53,7 @@ class LuceneReporterSuite extends munit.FunSuite:
     assertEquals(storedDoc.get("title_for_search"), "São Paulo medicine")
     assertEquals(storedDoc.get("currentField"), "Sao Paulo medicine")
 
-    val analyzer = new NGAnalyzer(search = true)
+    val analyzer = new NGAnalyzer()
     val query = new QueryParser("title_for_search", analyzer).parse("sao paulo")
     val hits = new IndexSearcher(reader).search(query, 10).scoreDocs
 
@@ -84,3 +84,15 @@ class LuceneReporterSuite extends munit.FunSuite:
 
     reader.close()
     directory.close()
+
+  test("reportFields serializes similarity as maybe when a compared field is empty"):
+    val result = CompResult("NGramComparator", "title", "", "present", None, None, 0.0, isSimilar = false)
+
+    val fields = LuceneReporter.reportFields(
+      Document(Seq("id" -> "1")),
+      Document(Seq("id" -> "2")),
+      Seq.empty,
+      Seq(result)
+    )
+
+    assertEquals(fields.collectFirst { case ("isSimilar", value) => value }, Some("maybe"))

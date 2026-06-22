@@ -27,17 +27,10 @@ class ExactComparator(fieldName: String,
     val cFields: Seq[String] = currentDoc.fields.filter(_._1.equals(fieldName)).map(_._2)
     val oString: String = oFields.map(_.trim).mkString(fieldSeparator)
     val cString: String = cFields.map(_.trim).mkString(fieldSeparator)
+    val oString2: String = if normalize then Tools.normalizeStr(oString) else oString
+    val cString2: String = if normalize then Tools.normalizeStr(cString) else cString
+    val bothEmpty = oString2.isEmpty && cString2.isEmpty
+    val similar: Boolean = !bothEmpty && oString2.equals(cString2)
 
-    if normalize then
-      val oStringNorm: String = Tools.normalizeStr(oString)
-      val cStringNorm: String = Tools.normalizeStr(cString)
-      val bothEmpty = oStringNorm.isEmpty && cStringNorm.isEmpty
-      val similar: Boolean = !bothEmpty && oStringNorm.equals(cStringNorm)
-
-      CompResult("ExactComparator", fieldName, oString, cString, Some(oStringNorm), Some(cStringNorm),
+    CompResult("ExactComparator", fieldName, oString, cString, Some(oString2), Some(cString2),
         if similar then 1 else 0, similar)
-    else
-      val bothEmpty = oString.isEmpty && cString.isEmpty
-      val similar: Boolean = !bothEmpty && oString.equals(cString)
-
-      CompResult("ExactComparator", fieldName, oString, cString, None, None, if similar then 1 else 0, similar)

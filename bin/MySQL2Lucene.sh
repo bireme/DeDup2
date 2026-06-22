@@ -10,49 +10,41 @@ export PATH=$JAVA_HOME/bin:$PATH
 if [ "$#" -lt "7" ]
   then
     echo 'MySQL2Lucene shell takes a list of documents retrieved from a MySQL database and'
-    echo 'creates a local DeDup index with them. If such index already exists, it will rewritten.'
+    echo 'creates a DeDup index with them. If such index already exists, it will rewritten.'
     echo
-    echo 'usage: MySQL2Lucene'
-    echo '   -host=<MySQL server> - IP or domain of the MySQL server'
-    echo '   -user=<MySQL user> - MySQL user name'
-    echo '   -pswd=<MySQL password> - MySQL user password'
-    echo '   -dbnm=<MySQL database> - MySQL database name'
-    echo '   -sqls=<MySQL sql file list> - comma separated sql file names'
-    echo '   -index=<indexPath> - NGrams Lucene index path'
-    echo '   -schema=<schemaFile> - NGram schema file'
-    echo
-    echo '   [-port=<MySQL_Port>] - MySQL port'
-    echo '   [-sqlEncoding=<sqlEncoding>] - sql file encoding. Default is utf-8'
-    echo '   [-jsonField=<tag>[,<tag>,...,<tag>]] - if a column element is a json element, indicates which json elements'
-    echo '                                          to retrieve the content. Default are text,_f,_e.'
-    echo '   [-repetitiveField=<name>[.<name>,...,<name>]] - the name of the fields that should be broken into a new line'
-    echo '                                                when the repetitive separator symbol is found. Default is title.'
-    echo '   [-repetitiveSep=<separator>] - repetitive field string separator. Default is //@//'
-    echo '   [-jsonLangField=<jsonLangField>] - the json field that store the language indicator. If present it will be'
-    echo '                                      used to suffix the id field with the language.'
-    echo '   [-idFieldName=<name>] - id field name of the mysql record]. Will be used to prefix the id with the language.'
-    echo '                           if the jsonLangField is specified.'
-    echo '   [-schemaEncoding=<schemaFileEncoding>] - NGram schema file encoding. Default is utf-8.'
-    echo '   [--append] - append documents to an existing Lucene index.'
+    echo 'usage: MySQL2Lucene <options>'
+    echo 'options:'
+    echo '	-mySqlHost=<host>       MySQL server host address'
+    echo '	-mySqlUser=<str>        MySQL database user'
+    echo '	-mySqlPassword=<str>    MySQL database password'
+    echo '	-mySqlDbname=<str>      MySQL database name'
+    echo '	-sqlfs=<name1>[,...,<nameN>] Comma-separated SQL statement files to execute sequentially.'
+    echo '	                        Results from each file are appended to the same Lucene index during this run.'
+    echo '	-index=<path>           Path to the index to be created'
+    echo '	-fieldToIndex=<name>     Name of the field to be indexed'
+    echo '	[-mySqlPort=<int>]      MySQL server port. Default is 3306.'
+    echo '	[-importFields=(<fieldName>,...,<fieldName>|file=<path>)] Fields that will be written to the Lucene documents.'
+    echo '	                         If absent, all fields returned by the SQL statements will be written.'
+    echo '	[-jsonFieldFile=<path>] Path to a text file with JSON field mappings, one per line, using: <column name>=<json field name>[-><new field name>]'
+    echo '	                        For mapped SQL columns, object fields are extracted from the JSON content and emitted with the configured new field names.'
+    echo '	                        When <new field name> is omitted, the SQL column name is used as the output field name.'
+    echo '	                        Missing JSON fields are ignored. JSON array values are grouped with '//@//'; arrays of non-objects keep the SQL column name.'
+    echo '	[-sqlEncoding=<str>]    SQL file character encoding. Default is "utf-8"'
+    echo '	[-repetitiveField=<name>[,<name>,...,<name>]] Fields split into multiple documents when repetitiveSep is found.'
+    echo '	[-repetitiveSep=<str>]  Separator used by repetitiveField. Default is "//@//".'
 
     exit 1
 fi
 
-cd /home/javaapps/sbt-projects/DCDup || exit
+cd /home/javaapps/sbt-projects/DeDup2 || exit
 
-NOW=$(date +"%Y%m%d%H%M%S")
-
-java -cp jar/DCDup-assembly-0.1.0.jar org.bireme.dcdup.MySQL2Pipe -pipe=pipeOut_$NOW.txt -jsonField=text,_f,_e,_u -repetitiveField=title $1 $2 $3 $4 $5 $6 $7 $8 $9 ${10} ${11} ${12} ${13} ${14} ${15} ${16}
+sbt "runMain dd.tools.SQL2Lucene '$1' '$2' '$3' '$4' '$5' '$6' '$7' '$8' '$9' '${10}' '${11}' '${12}' '${13}' '${14}' '${15}' '${16}'"
 
 if [ "$?" -ne 0 ]; then
   echo 'Pipe file generation error'
+  cd -
   exit 1
 fi
-
-#java -cp jar/DCDup-assembly-0.1.0.jar org.bireme.dcdup.Pipe2Lucene -pipe=pipeOut_$NOW.txt -pipeEncoding=utf-8 $1 $2 $3 $4 $5 $6 $7 $8 $9 ${10} ${11} ${12} ${13} ${14} ${15} ${16}
-/home/users/operacao/.local/share/coursier/bin/sbt "runMain org.bireme.dcdup.Pipe2Lucene -pipe=pipeOut_$NOW.txt -pipeEncoding=utf-8 $1 $2 $3 $4 $5 $6 $7 $8 $9 ${10} ${11} ${12} ${13} ${14} ${15} ${16}"
-
-#rm pipeOut_$NOW.txt
 
 cd - || exit
 

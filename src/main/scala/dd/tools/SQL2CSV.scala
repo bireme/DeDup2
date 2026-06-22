@@ -2,9 +2,10 @@ package dd.tools
 
 import dd.producers.{MySqlProducerConfig, MysqlProducer}
 import dd.interfaces.Document
-import play.api.libs.json.{JsNull, JsObject, JsString, Json}
+import play.api.libs.json.{JsArray, JsString, JsValue, Json}
 
 import java.io.{BufferedWriter, FileWriter}
+import scala.collection.mutable
 import scala.io.Source
 import scala.util.{Failure, Success, Try, Using}
 
@@ -216,11 +217,12 @@ object SQL2CSV:
             Try(documentToFields(document)) match
               case Success(fields) =>
                 if header.isEmpty then
-                  header = fields.keys.toVector
+                  header = fields.map(_._1).toVector
                   writer.write(csvRecord(header, fieldSeparator))
                   writer.newLine()
 
-                val row: String = csvRecord(header.map(column => fields.getOrElse(column, "")), fieldSeparator)
+                val fieldMap = fields.toMap
+                val row: String = csvRecord(header.map(column => fieldMap.getOrElse(column, "")), fieldSeparator)
                 writer.write(row)
                 writer.newLine()
 
@@ -230,14 +232,37 @@ object SQL2CSV:
             current += 1
 
   /**
-   * Converts the internal document to a flat field map.
+   * Converts the internal document to flat fields while preserving field order.
    *
-   * This method reuses the existing JSON conversion used by SQL2Json and then
-   * reads the top-level JSON object so the CSV export keeps the same field
-   * names and values already produced by the project tooling.
+   * Repeated field names are grouped at the position of their first occurrence,
+   * matching the JSON-array behavior previously used by this exporter without
+   * losing the SQL result-set column order.
    */
-  private def documentToFields(document: Document): Map[String, String] =
-    parseTopLevelJsonObject(Tools.doc2json(document).toString())
+  private[tools] def documentToFields(document: Document): Seq[(String, String)] =
+    val grouped = mutable.LinkedHashMap.empty[String, Vector[JsValue]]
+    document.fields.foreach:
+      case (key, value) =>
+        val current = grouped.getOrElse(key, Vector.empty)
+        grouped.update(key, current :+ csvFieldValue(value))
+
+    grouped.toSeq.map:
+      case (key, values) =>
+        val value =
+          values match
+            case Seq(single) => stringifyCsvFieldValue(single)
+            case many => Json.stringify(JsArray(many))
+        key -> value
+
+  private def csvFieldValue(value: String): JsValue =
+    val trimmed = Option(value).getOrElse("").trim
+    if trimmed.startsWith("[") || trimmed.startsWith("{") then
+      Try(Json.parse(trimmed)).getOrElse(JsString(trimmed))
+    else JsString(trimmed)
+
+  private def stringifyCsvFieldValue(value: JsValue): String =
+    value match
+      case JsString(text) => text
+      case other => Json.stringify(other)
 
   /**
    * Escapes a value according to RFC 4180 CSV conventions.
@@ -253,20 +278,3 @@ object SQL2CSV:
    */
   private[tools] def csvRecord(values: Iterable[String], fieldSeparator: Char): String =
     values.map(csvEscape(_, fieldSeparator)).mkString(fieldSeparator.toString)
-
-  /**
-   * Parses a top-level JSON object into a string map.
-   *
-   * Nested objects and arrays are preserved as compact JSON text in the CSV
-   * cell. Null values are written as empty CSV cells.
-   */
-  private def parseTopLevelJsonObject(json: String): Map[String, String] =
-    Json.parse(json) match
-      case JsObject(fields) =>
-        fields.view.mapValues:
-          case JsString(value) => value
-          case JsNull => ""
-          case value => Json.stringify(value)
-        .toMap
-      case other =>
-        throw IllegalArgumentException(s"Expected top-level JSON object, found ${other.getClass.getSimpleName}")

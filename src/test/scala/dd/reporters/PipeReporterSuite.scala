@@ -58,7 +58,7 @@ class PipeReporterSuite extends munit.FunSuite:
     assert(written.isSuccess)
     assertEquals(
       writer.toString,
-      "null|2|NGramComparator|title|null|null|null|null|0.0|false"
+      "null|2|NGramComparator|title|null|null|null|null|0.0|maybe"
     )
 
   test("writeResults exports original and other comparison fields separately"):

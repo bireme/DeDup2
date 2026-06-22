@@ -2,7 +2,7 @@ name := "DeDup2"
 
 version := "0.1"
 
-scalaVersion := "3.8.3"
+scalaVersion := "3.8.4"
 
 val luceneVersion = "10.4.0"
 val stringDistanceVersion = "1.2.7"
@@ -10,7 +10,8 @@ val commonsCVSVersion = "1.14.1"
 val playJsonVersion = "3.1.0-M10"
 val mysqlConnectorJVersion = "9.7.0"
 val mongoVersion = "5.8.0"
-val munitVersion = "1.3.0"
+val munitVersion = "1.3.3"
+val oxVersion = "1.0.5"
 
 libraryDependencies ++= Seq(
   "org.apache.lucene" % "lucene-analysis-common" % luceneVersion,
@@ -22,6 +23,7 @@ libraryDependencies ++= Seq(
   "org.playframework" %% "play-json" % playJsonVersion,
   "com.mysql" % "mysql-connector-j" % mysqlConnectorJVersion,
   "org.mongodb" % "mongodb-driver-sync" % mongoVersion,
+  "com.softwaremill.ox" %% "core" % oxVersion,
   "org.scalameta" %% "munit" % munitVersion % Test
 )
 

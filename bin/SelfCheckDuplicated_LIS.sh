@@ -9,11 +9,7 @@ export PATH=$JAVA_HOME/bin:$PATH
 
 cd /home/javaapps/sbt-projects/DeDup2/ || exit
 
-. /bases/fiadmin2/exec/settings/dedup.inc
-
-bin/GenLISPipe.sh
-mv ./LIS.pipe selfCheck/LIS/ 
-bin/SelfCheckDuplicated.sh -pipe=selfCheck/LIS/LIS.pipe -schema=schemas/configLIS_Two.cfg -outDupFile=selfCheck/LIS/dup.pip -outNoDupFile=selfCheck/LIS/nodup.pip -pipeEncoding=utf-8
+bin/SelfCheckDuplicated.sh conf/LIS_Two_self.cfg
 
 cd -|| exit
 
