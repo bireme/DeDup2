@@ -5,13 +5,12 @@ import dd.interfaces.{DocsFinder, DocsProducer, Document}
 import dd.tools.StringSimilarity.DiceCoefficient
 import dd.tools.Tools
 import org.apache.lucene.document
+import org.apache.lucene.analysis.tokenattributes.CharTermAttribute
 import org.apache.lucene.index.DirectoryReader
 import org.apache.lucene.index.Term
 import org.apache.lucene.queryparser.classic.QueryParser
-import org.apache.lucene.queries.spans.{SpanNearQuery, SpanQuery, SpanTermQuery}
-import org.apache.lucene.search.{BooleanClause, BooleanQuery, BoostQuery, ConstantScoreQuery, IndexSearcher, MatchNoDocsQuery, Query, ScoreDoc}
+import org.apache.lucene.search.{BooleanClause, BooleanQuery, ConstantScoreQuery, IndexSearcher, MatchNoDocsQuery, Query, ScoreDoc, TermQuery}
 import org.apache.lucene.store.{Directory, FSDirectory}
-import org.apache.lucene.analysis.tokenattributes.CharTermAttribute
 
 import java.io.File
 import java.io.StringReader
@@ -36,9 +35,7 @@ class LuceneDocsFinder(luceneIndex: String,
   private val ireader: DirectoryReader = DirectoryReader.open(directory)
   private val isearcher: IndexSearcher = new IndexSearcher(ireader)
   private val analyzer: NGAnalyzer = new NGAnalyzer()
-  private val orderedTokenSlop: Int = 1_000_000
-  private val maxBooleanClauses: Int = 1024
-  private val maxNestedTermClauses: Int = 900
+  private val maxQueryTokens: Int = 100
 
   /**
    * Finds the documents that match the given query.
@@ -73,74 +70,28 @@ class LuceneDocsFinder(luceneIndex: String,
                          query: String,
                          auxQuery: Option[String],
                          parser: QueryParser): Query =
-    val positionalQuery = buildPositionalTokenQuery(searchField, query)
+    val tokenQuery = buildTokenQuery(searchField, query)
 
     auxQuery match
       case Some(aqry) =>
         val builder = new BooleanQuery.Builder()
-        builder.add(positionalQuery, BooleanClause.Occur.MUST)
+        builder.add(tokenQuery, BooleanClause.Occur.MUST)
         builder.add(parser.parse(aqry), BooleanClause.Occur.FILTER)
         builder.build()
-      case None => positionalQuery
+      case None => tokenQuery
 
-  private def buildPositionalTokenQuery(searchField: String,
-                                        query: String): Query =
-    val tokens = analyzedTokens(searchField, query).take(maxNestedTermClauses)
-    if tokens.isEmpty then MatchNoDocsQuery("empty positional token query")
+  private def buildTokenQuery(searchField: String,
+                              query: String): Query =
+    val tokens = analyzedTokens(searchField, query).take(maxQueryTokens)
+    if tokens.isEmpty then MatchNoDocsQuery("empty token query")
     else
       val builder = new BooleanQuery.Builder()
       builder.setMinimumNumberShouldMatch(1)
 
       tokens.foreach: token =>
-        builder.add(ConstantScoreQuery(spanTerm(searchField, token)), BooleanClause.Occur.SHOULD)
-
-      val includeOrderedSequence = tokens.size > 1 && tokens.size * 2 <= maxNestedTermClauses
-      val sequenceTermCost = if includeOrderedSequence then tokens.size else 0
-      val pairLimitByNestedTerms = (maxNestedTermClauses - tokens.size - sequenceTermCost) / 2
-      val pairLimitByBooleanClauses = maxBooleanClauses - tokens.size - (if includeOrderedSequence then 1 else 0)
-      val orderedPairLimit = math.min(pairLimitByNestedTerms, pairLimitByBooleanClauses)
-
-      orderedTokenPairs(tokens, orderedPairLimit).foreach:
-        case (left, right) =>
-          val orderedPair = orderedNearQuery(searchField, Seq(left, right))
-          builder.add(BoostQuery(ConstantScoreQuery(orderedPair), 0.25f), BooleanClause.Occur.SHOULD)
-
-      if includeOrderedSequence then
-        val orderedSequence = orderedNearQuery(searchField, tokens)
-        builder.add(
-          BoostQuery(ConstantScoreQuery(orderedSequence), tokens.size.toFloat),
-          BooleanClause.Occur.SHOULD
-        )
+        builder.add(ConstantScoreQuery(TermQuery(Term(searchField, token))), BooleanClause.Occur.SHOULD)
 
       builder.build()
-
-  private def orderedTokenPairs(tokens: Seq[String],
-                                limit: Int): Seq[(String, String)] =
-    if limit <= 0 then Seq.empty
-    else
-      val pairs = ListBuffer.empty[(String, String)]
-      var gap = 1
-
-      while gap < tokens.size && pairs.size < limit do
-        var left = 0
-        while left + gap < tokens.size && pairs.size < limit do
-          pairs += (tokens(left) -> tokens(left + gap))
-          left += 1
-        gap += 1
-
-      pairs.toSeq
-
-  private def orderedNearQuery(searchField: String,
-                               tokens: Seq[String]): SpanNearQuery =
-    SpanNearQuery(
-      tokens.map(token => spanTerm(searchField, token)).toArray,
-      orderedTokenSlop,
-      true
-    )
-
-  private def spanTerm(searchField: String,
-                       token: String): SpanQuery =
-    SpanTermQuery(Term(searchField, token))
 
   private def analyzedTokens(searchField: String,
                              value: String): Seq[String] =
