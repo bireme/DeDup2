@@ -164,11 +164,7 @@ private[reporters] object MongoDBReporter:
    * @return BSON field entry derived from the result field name
    */
   def resultFieldFor(result: CompResult): (String, bson.Document) =
-    val fieldKey =
-      if result.originalField.isEmpty || result.currentField.isEmpty then s"${result.fieldName}_*"
-      else result.fieldName
-
-    fieldKey -> new bson.Document()
+    result.fieldName -> new bson.Document()
       .append("name", result.name)
       .append("originalField", result.originalField)
       .append("currentField", result.currentField)

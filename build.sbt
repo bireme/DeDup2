@@ -4,13 +4,13 @@ version := "0.1"
 
 scalaVersion := "3.8.4"
 
-val luceneVersion = "10.4.0"
+val luceneVersion = "10.5.0"
 val stringDistanceVersion = "1.2.7"
 val commonsCVSVersion = "1.14.1"
 val playJsonVersion = "3.1.0-M10"
 val mysqlConnectorJVersion = "9.7.0"
-val mongoVersion = "5.8.0"
-val munitVersion = "1.3.3"
+val mongoVersion = "5.9.0"
+val munitVersion = "1.3.4"
 val oxVersion = "1.0.5"
 
 libraryDependencies ++= Seq(
