@@ -51,36 +51,20 @@ fi
 
 # diretorio inicial
 INITIAL_DIR=$PWD
+PROJECT_DIR=/home/javaapps/sbt-projects/DeDup2/
 
 # vai para o diretório onde serão gerados os índices
-cd /home/javaapps/sbt-projects/DeDup2/ || exit
+cd $PROJECT_DIR || exit
 checkError "$?"  "vai para o diretorio base do processamento dos indices"
-
-# move diretório work para diretório work_old
-if [[ -d "work_old" ]]; then
-  rm -fr work_old
-  checkError "$?" "apaga diretorio work_old"
-fi  
-if [[ -d "work" ]]; then
-  mv work work_old
-  checkError "$?" "move diretorio work para diretório work_old"
-else
-  mkdir work_old
-  checkError "$?" "criando diretorio work_old"
-fi
-
-# cria diretório work
-mkdir work
-checkError "$?" "cria diretorio work"
 
 # processa os indices
 tuplas=(
-  "LILACS_Sas.sql LILACS_Sas_ingles.sql lilacs_Sas "
-  "LIS.sql LIS"
-  "LILACS_MNT.sql LILACS_MNT_ingles.sql lilacs_MNT"
-  "LILACS_MNTam.sql LILACS_MNTam_ingles.sql lilacs_MNTam"
-  "DIREV.sql DIREV"
-  "LILACS_Sas_Source.sql lilacs_Sas_Source"
+  "LILACS_Sas.sql LILACS_Sas_ingles.sql lilacs_Sas LILACS_Sas_Seven.cfg"
+  "LIS.sql LIS LIS_Two.cfg"
+  "LILACS_MNT.sql LILACS_MNT_ingles.sql lilacs_MNT LILACS_MNT_Four.cfg"
+  "LILACS_MNTam.sql LILACS_MNTam_ingles.sql lilacs_MNTam LILACS_MNTam_Five.cfg"
+  "DIREV.sql DIREV DIREV_Three.cfg"
+  "LILACS_Sas_Source.sql lilacs_Sas_Source LILACS_Sas_Source.cfg"
 )
 
 # Geração dos índices a partir do MySql
@@ -96,15 +80,11 @@ for linha in "${tuplas[@]}"; do
 
       echo
       echo "==== $index ==== [TIME-STAMP] `date '+%Y.%m.%d %H:%M:%S'`"
-      echo "./MySQL2Lucene.sh -mySqlHost=$mysqlserver -mySqlPort=$mysqlport -mySqlUser=$servername -mySqlPassword=$serverpassword -mySqlDbname=$serverdatabase -sqls=$sql1 -index=$index -schema=$schema"
-      bin/MySQL2Lucene.sh -mySqlHost=$mysqlserver -mySqlPort=$mysqlport -mySqlUser=$servername -mySqlPassword=$serverpassword -mySqlDbname=$serverdatabase -sqls=$sql1 -index=$index -schema=$schema
+      echo "bin/MySQL2Lucene.sh -mySqlHost=$mysqlserver -mySqlPort=$mysqlport -mySqlUser=$servername -mySqlPassword=$serverpassword -mySqlDbname=$serverdatabase -sqlfs=$sql1 -index=$index -schema=$schema -fieldToIndex=title -jsonFieldFile=conf/jsonFields.txt"
+      bin/MySQL2Lucene.sh -mySqlHost=$mysqlserver -mySqlPort=$mysqlport -mySqlUser=$servername -mySqlPassword=$serverpassword -mySqlDbname=$serverdatabase -sqls=$sql1 -index=$index -schema=$schema -fieldToIndex=title -jsonFieldFile=conf/jsonFields.txt
       ret="$?"
       if [ "$ret" -ne 0 ]; then
         sendemail -f appofi@bireme.org -u "DeDup Service - index creation ERROR - $(date '+%Y%m%d')" -m "DeDup Service - Erro na criacao do indice $index." -t appofi@bireme.org -cc barbieri@paho.org -s esmeralda.bireme.br
-        if [[ -d "work_old/$index" ]]; then
-          cp -pr ../work_old/$index work/
-          checkError "$?" "copia do antigo indice para o diretorio atual"
-        fi
       fi
       ;;
 
@@ -116,15 +96,11 @@ for linha in "${tuplas[@]}"; do
 
       echo
       echo "==== $index ===="
-      echo "./MySQL2Lucene.sh -mySqlHost=$mysqlserver -mySqlPort=$mysqlport -mySqlUser=$servername -mySqlPassword=$serverpassword -mySqlDbname=$serverdatabase -sqls=$sql1,$sql2 -index=$index -schema=$schema"
-      bin/MySQL2Lucene.sh -mySqlHost=$mysqlserver -mySqlPort=$mysqlport -mySqlUser=$servername -mySqlPassword=$serverpassword -mySqlDbname=$serverdatabase -sqls=$sql1,$sql2 -index=$index -schema=$schema
+      echo "bin/MySQL2Lucene.sh -mySqlHost=$mysqlserver -mySqlPort=$mysqlport -mySqlUser=$servername -mySqlPassword=$serverpassword -mySqlDbname=$serverdatabase -sqls=$sql1,$sql2 -index=$index -schema=$schema -fieldToIndex=title -jsonFieldFile=conf/jsonFields.txt"
+      bin/MySQL2Lucene.sh -mySqlHost=$mysqlserver -mySqlPort=$mysqlport -mySqlUser=$servername -mySqlPassword=$serverpassword -mySqlDbname=$serverdatabase -sqls=$sql1,$sql2 -index=$index -schema=$schema -fieldToIndex=title -jsonFieldFile=conf/jsonFields.txt
       ret="$?"
       if [ "$ret" -ne 0 ]; then
         sendemail -f appofi@bireme.org -u "DeDup Service - index creation ERROR - $(date '+%Y%m%d')" -m "DeDup Service - Erro na criacao do indice $index." -t appofi@bireme.org -cc barbieri@paho.org -s esmeralda.bireme.br
-        if [[ -d "work_old/$index" ]]; then
-          cp -pr ../work_old/$index work/
-          checkError "$?" "copia do antigo indice para o diretório atual"
-        fi
       fi
       ;;
 
