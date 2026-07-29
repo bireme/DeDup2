@@ -50,6 +50,27 @@ class MysqlProducerSuite extends munit.FunSuite:
       )
     )
 
+  test("getJsonSeq creates one document variant per occurrence of the configured split field"):
+    val variants = MysqlProducer.getJsonSeq(
+      """[
+        |{"text":"Spanish title"},
+        |{"text":"Portuguese title"},
+        |{"text":"English title"}
+        |]""".stripMargin,
+      "title",
+      Map("text" -> "title"),
+      splitDocumentField = Some("title")
+    ).get
+
+    assertEquals(
+      variants,
+      Seq(
+        Seq("title" -> "Spanish title"),
+        Seq("title" -> "Portuguese title"),
+        Seq("title" -> "English title")
+      )
+    )
+
   test("getJsonSeq ignores empty mapped JSON values when grouping one array element"):
     val variants = MysqlProducer.getJsonSeq(
       """[{"_e":"","_f":"94"}]""",

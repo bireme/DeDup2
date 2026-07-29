@@ -38,7 +38,7 @@ fi
 
 cd /home/javaapps/sbt-projects/DeDup2 || exit
 
-sbt "runMain dd.tools.SQL2Lucene '$1' '$2' '$3' '$4' '$5' '$6' '$7' '$8' '$9' '${10}' '${11}' '${12}' '${13}'"
+sbt "runMain dd.tools.SQL2Lucene $1 $2 $3 $4 $5 $6 $7 $8 $9 ${10} ${11} ${12} ${13}"
 
 if [ "$?" -ne 0 ]; then
   echo 'Pipe file generation error'
@@ -47,4 +47,3 @@ if [ "$?" -ne 0 ]; then
 fi
 
 cd - || exit
-

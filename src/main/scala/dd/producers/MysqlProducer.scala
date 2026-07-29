@@ -15,6 +15,10 @@ import scala.util.{Failure, Success, Try}
  * The configuration groups connection details, SQL source settings, and the
  * optional mappings needed to expand JSON and repetitive fields into the
  * internal document representation produced by the pipeline.
+ *
+ * @param splitDocumentField optional name of a JSON-array field whose elements
+ *                           must become separate documents. Other JSON arrays
+ *                           remain grouped with `//@//`.
  */
 case class MySqlProducerConfig(mySqlHost: String,
                                mySqlPort: Int,
@@ -25,7 +29,8 @@ case class MySqlProducerConfig(mySqlHost: String,
                                sqlEncoding: String,
                                jsonFields: Option[Map[String, Map[String, String]]],
                                repetitiveFields: Option[Set[String]],
-                               repetitiveSep: Option[String]):
+                               repetitiveSep: Option[String],
+                               splitDocumentField: Option[String] = None):
   require(mySqlHost.trim.nonEmpty)
   require(mySqlPort > 0)
   require(mySqlDbname.trim.nonEmpty)
@@ -83,18 +88,23 @@ object MysqlProducer:
    * @param jsonStr raw JSON content to parse
    * @param jsonFieldName name assigned to values that cannot be expanded
    * @param jsonFields mapping that describes how JSON fields should be extracted
+   * @param splitDocumentField field whose JSON-array elements are emitted as
+   *                           separate document variants instead of being joined
    * @return field variants extracted from the JSON content
    */
   private[producers] def getJsonSeq(jsonStr: String,
                                     jsonFieldName: String,
-                                    jsonFields: Map[String, String]): Try[FieldVariants]=
+                                    jsonFields: Map[String, String],
+                                    splitDocumentField: Option[String] = None): Try[FieldVariants]=
     Try:
       jsonStr.trim match
         case "" => Seq(Seq(jsonFieldName -> ""))
         case jstr =>
           Try(Json.parse(jstr)).map:
             case arr: JsArray =>
-              Seq(extractJsonArrayFields(arr, jsonFieldName, jsonFields))
+              if splitDocumentField.contains(jsonFieldName) then
+                extractJsonArrayFieldVariants(arr, jsonFieldName, jsonFields)
+              else Seq(extractJsonArrayFields(arr, jsonFieldName, jsonFields))
             case obj: JsObject =>
               Seq(extractJsonObjectFields(obj, jsonFields))
             case str: JsString =>
@@ -141,6 +151,24 @@ object MysqlProducer:
         Seq(jsonFieldName -> joinJsonArrayValues(seq.map(_.toString())))
       case None =>
         Seq(jsonFieldName -> "")
+
+  /**
+   * Expands a JSON array into one document variant per element.
+   *
+   * This is used only for the field named by `splitDocumentField`; all other
+   * JSON arrays use the grouped representation produced by
+   * `extractJsonArrayFields`.
+   */
+  private def extractJsonArrayFieldVariants(arr: JsArray,
+                                            jsonFieldName: String,
+                                            jsonFields: Map[String, String]): FieldVariants =
+    arr.value.toSeq match
+      case values if values.headOption.exists(_.isInstanceOf[JsObject]) =>
+        values.collect:
+          case obj: JsObject => extractJsonObjectFields(obj, jsonFields)
+      case values if values.nonEmpty =>
+        values.map(value => Seq(jsonFieldName -> value.toString()))
+      case _ => Seq(Seq(jsonFieldName -> ""))
 
   /**
    * Joins non-empty array values after case-insensitive sorting while preserving originals.
@@ -217,7 +245,7 @@ class MysqlProducer(conf: MySqlProducerConfig) extends DocsProducer:
       case head +: tail => head #:: getDocuments(rs, statement, con, tail)
       case _ =>
         if rs.next() then
-          parseRecord(rs, conf.jsonFields, conf.repetitiveFields, conf.repetitiveSep) match
+          parseRecord(rs, conf.jsonFields, conf.repetitiveFields, conf.repetitiveSep, conf.splitDocumentField) match
             case Success(doc +: tail) => doc #:: getDocuments(rs, statement, con, tail)
             case Success(_) => getDocuments(rs, statement, con, Seq.empty)
             case Failure(exception) =>
@@ -240,19 +268,21 @@ class MysqlProducer(conf: MySqlProducerConfig) extends DocsProducer:
    * @param jsonFields mapping that describes how JSON fields should be extracted
    * @param repetitiveFields field names that may produce repeated values
    * @param repetitiveSep value of repetitive sep
+   * @param splitDocumentField JSON-array field expanded into one document per occurrence
    * @return documents parsed from the current database row
    */
   private def parseRecord(rs: ResultSet,
                           jsonFields: Option[Map[String, Map[String, String]]],
                           repetitiveFields: Option[Set[String]],
-                          repetitiveSep: Option[String]): Try[Seq[Document]] = {
+                          repetitiveSep: Option[String],
+                          splitDocumentField: Option[String]): Try[Seq[Document]] = {
     for
       fieldVariants <- fieldNames(rs).flatMap:
         _.foldLeft(Try(Seq(Seq.empty[(String, String)]))):
           case (acc, (column, fieldName)) =>
             for
               current <- acc
-              values <- extractFieldValues(rs, column, fieldName, jsonFields, repetitiveFields, repetitiveSep)
+              values <- extractFieldValues(rs, column, fieldName, jsonFields, repetitiveFields, repetitiveSep, splitDocumentField)
             yield combineFieldVariants(current, values)
     yield fieldVariants.map(fields => Document(fields))
   }
@@ -277,6 +307,7 @@ class MysqlProducer(conf: MySqlProducerConfig) extends DocsProducer:
    * @param jsonFields mapping used to expand JSON fields
    * @param repetitiveFields field names configured as repetitive
    * @param repetitiveSep separator used to split repetitive fields
+   * @param splitDocumentField JSON-array field expanded into separate document variants
    * @return result containing the normalized field variants for the column
    */
   private def extractFieldValues(rs: ResultSet,
@@ -284,12 +315,13 @@ class MysqlProducer(conf: MySqlProducerConfig) extends DocsProducer:
                                  fieldName: String,
                                  jsonFields: Option[Map[String, Map[String, String]]],
                                  repetitiveFields: Option[Set[String]],
-                                 repetitiveSep: Option[String]): Try[FieldVariants] = {
+                                 repetitiveSep: Option[String],
+                                 splitDocumentField: Option[String]): Try[FieldVariants] = {
     Option(rs.getString(column)).map(_.trim)
       .map:
         content =>
           jsonFields.flatMap(_.get(fieldName))
-            .map(MysqlProducer.getJsonSeq(content, fieldName, _))
+            .map(MysqlProducer.getJsonSeq(content, fieldName, _, splitDocumentField))
             .getOrElse(Success(splitRepetitive(fieldName, content, repetitiveFields, repetitiveSep).map(value => Seq(fieldName -> value))))
       .getOrElse(Success(Seq(Seq(fieldName -> ""))))
   }
