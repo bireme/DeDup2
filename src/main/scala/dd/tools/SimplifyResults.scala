@@ -68,12 +68,7 @@ object SimplifyResults:
     yield total
 
   private def parseArgs(args: Array[String]): Try[Map[String, String]] =
-    Success(args.foldLeft(Map.empty[String, String]):
-      case (map, par) =>
-        val split = par.split(" *= *", 2)
-        if split.size == 1 then map + (split(0).substring(2) -> "")
-        else map + (split(0).substring(1) -> split(1))
-    )
+    Tools.parseCommandLineArgs(args)
 
   private def parseConfig(parameters: Map[String, String]): Try[Config] =
     for

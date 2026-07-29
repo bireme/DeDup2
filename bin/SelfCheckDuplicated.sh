@@ -20,7 +20,6 @@ fi
 
 cd /home/javaapps/sbt-projects/DeDup2/ || exit
 
-printf -v quoted_args " '%s'" "$@"
-sbt "runMain dd.SelfCheckDuplicated$quoted_args"
+sbt "runMain dd.SelfCheckDuplicated $*"
 
 cd - || exit

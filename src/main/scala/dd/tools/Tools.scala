@@ -24,6 +24,28 @@ import scala.util.{Failure, Success, Try}
  */
 object Tools:
   /**
+   * Parses command-line options, accepting arguments optionally surrounded by
+   * matching single or double quotes.
+   *
+   * @param args command-line arguments
+   * @return parsed option names and values
+   */
+  def parseCommandLineArgs(args: Array[String]): Try[Map[String, String]] =
+    Try:
+      args.foldLeft(Map.empty[String, String]):
+        case (map, rawArgument) =>
+          val argument =
+            if rawArgument.length >= 2 &&
+              ((rawArgument.head == '\'' && rawArgument.last == '\'') ||
+                (rawArgument.head == '"' && rawArgument.last == '"'))
+            then rawArgument.substring(1, rawArgument.length - 1)
+            else rawArgument
+
+          val split = argument.split(" *= *", 2)
+          if split.length == 1 then map + (split(0).substring(2) -> "")
+          else map + (split(0).substring(1) -> split(1))
+
+  /**
    * Normalizes a string for comparison.
    *
    * @param in input string to normalize
@@ -40,7 +62,7 @@ object Tools:
    */
   def parseSqlFileList(sqlfs: String): Try[Seq[String]] =
     Try:
-      val files = sqlfs.split(" *, *").toSeq.map(_.trim).filter(_.nonEmpty)
+      val files = sqlfs.replace("\\,", ",").split(" *, *").toSeq.map(_.trim).filter(_.nonEmpty)
       if files.isEmpty then throw IllegalArgumentException("Parameter sqlfs must contain at least one SQL file.")
       files
 
