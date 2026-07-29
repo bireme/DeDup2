@@ -17,7 +17,6 @@ fi
 
 cd /home/javaapps/sbt-projects/DeDup2 || exit
 
-printf -v quoted_config " '%s'" "$1"
-sbt "runMain dd.SimilarDocs$quoted_config"
+sbt "runMain dd.SimilarDocs $1"
 
 cd - || exit
