@@ -400,7 +400,9 @@ object ConfMain:
    * Parses MySQL producer settings without opening a database connection.
    *
    * This is used by SimilarDocs and SelfCheckDuplicated to centralize the
-   * JSON-to-configuration conversion for MySQL-backed sources.
+   * JSON-to-configuration conversion for MySQL-backed sources. The optional
+   * `splitDocumentField` property names a JSON-array field whose occurrences
+   * are emitted as separate documents instead of one `//@//`-joined value.
    *
    * @param json JSON object containing the MySQL producer configuration
    * @return parsed MySQL producer configuration
@@ -422,7 +424,8 @@ object ConfMain:
       repetitiveFields = optionalStringSeq(map, "repetitiveFields")
         .orElse(optionalStringSeq(map, "repetitiveField"))
         .map(_.toSet),
-      repetitiveSep = optionalString(map, "repetitiveSep")
+      repetitiveSep = optionalString(map, "repetitiveSep"),
+      splitDocumentField = optionalString(map, "splitDocumentField")
     )
 
   /**
