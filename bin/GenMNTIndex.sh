@@ -11,6 +11,10 @@ cd /home/javaapps/sbt-projects/DeDup2 || exit
 
 if [ -f /bases/fiadmin2/exec/settings/dedup.inc ]; then
   . /bases/fiadmin2/exec/settings/dedup.inc
+elif [ -f ./dedup.inc ]; then
+  DEDUP_VALIDATE_PATHS=0
+  . ./dedup.inc
+  unset DEDUP_VALIDATE_PATHS
 fi
 
 bin/MySQL2Lucene.sh -mySqlHost=$mysqlserver -mySqlPort=$mysqlport -mySqlUser=$servername -mySqlPassword=$serverpassword -mySqlDbname=$serverdatabase -sqlfs=sqls/LILACS_MNT.sql,sqls/LILACS_MNT_ingles.sql -index=indexes/LILACS_MNT -fieldToIndex=title_monographic -jsonFieldFile=conf/jsonFields.txt

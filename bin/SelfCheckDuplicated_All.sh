@@ -29,12 +29,12 @@ bin/SelfCheckDuplicated_DIREV.sh
 
 echo
 echo "------------------------------------------------"
-echo "Procurando duplicados na base Lilacs_Sas..."
+echo "Procurando duplicados na base LILACS_Sas..."
 bin/SelfCheckDuplicated_LILACS_Sas.sh
 
 echo
 echo "------------------------------------------------"
-echo "Procurando duplicados na base Lilacs_Sas_Source..."
+echo "Procurando duplicados na base LILACS_Sas_Source..."
 bin/SelfCheckDuplicated_LILACS_Sas_Source.sh
 
 echo
@@ -82,4 +82,3 @@ echo
 echo
 
 cd - || exit
-

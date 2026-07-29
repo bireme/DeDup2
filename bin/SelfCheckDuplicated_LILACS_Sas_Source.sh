@@ -9,7 +9,6 @@ export PATH=$JAVA_HOME/bin:$PATH
 
 cd /home/javaapps/sbt-projects/DeDup2/ || exit
 
-bin/SelfCheckDuplicated.sh conf/LILACS_Sas_Source_Four_self.cfg
+bin/SelfCheckDuplicated.sh conf/LILACS_Sas_Source_Five_self.cfg
 
 cd -|| exit
-

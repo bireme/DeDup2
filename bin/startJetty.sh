@@ -6,6 +6,8 @@ pid_file="$project_dir/server/jetty.pid"
 log_file="$project_dir/server/jetty.log"
 port="${JETTY_PORT:-8080}"
 
+mkdir -p "$(dirname "$pid_file")"
+
 find_listener() {
   fuser -n tcp "$port" 2>/dev/null | awk '{print $1}' || true
 }

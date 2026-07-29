@@ -11,8 +11,12 @@ cd /home/javaapps/sbt-projects/DeDup2 || exit
 
 if [ -f /bases/fiadmin2/exec/settings/dedup.inc ]; then
   . /bases/fiadmin2/exec/settings/dedup.inc
+elif [ -f ./dedup.inc ]; then
+  DEDUP_VALIDATE_PATHS=0
+  . ./dedup.inc
+  unset DEDUP_VALIDATE_PATHS
 fi
 
-bin/MySQL2CSV.sh -mySqlHost=$mysqlserver -mySqlPort=$mysqlport -mySqlUser=$servername -mySqlPassword=$serverpassword -mySqlDbname=$serverdatabase -sqlfs=sqls/LILACS_Sas.sql,sqls/LILACS_Sas_ingles.sql -outCsvFile=csv/lilacs_Sas.csv -jsonFieldFile=conf/jsonFields.txt -splitDocumentField=title
+bin/MySQL2CSV.sh -mySqlHost=$mysqlserver -mySqlPort=$mysqlport -mySqlUser=$servername -mySqlPassword=$serverpassword -mySqlDbname=$serverdatabase -sqlfs=sqls/LILACS_Sas.sql,sqls/LILACS_Sas_ingles.sql -outCsvFile=csv/LILACS_Sas.csv -jsonFieldFile=conf/jsonFields.txt -splitDocumentField=title
 
 cd - || exit
