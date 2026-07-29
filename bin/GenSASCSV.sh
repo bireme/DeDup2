@@ -13,6 +13,6 @@ if [ -f /bases/fiadmin2/exec/settings/dedup.inc ]; then
   . /bases/fiadmin2/exec/settings/dedup.inc
 fi
 
-bin/MySQL2CSV.sh -mySqlHost=$mysqlserver -mySqlPort=$mysqlport -mySqlUser=$servername -mySqlPassword=$serverpassword -mySqlDbname=$serverdatabase -sqlfs=sqls/LILACS_Sas.sql,sqls/LILACS_Sas_ingles.sql -outCsvFile=csv/lilacs_Sas.csv -jsonFieldFile=conf/jsonFields.txt
+bin/MySQL2CSV.sh -mySqlHost=$mysqlserver -mySqlPort=$mysqlport -mySqlUser=$servername -mySqlPassword=$serverpassword -mySqlDbname=$serverdatabase -sqlfs=sqls/LILACS_Sas.sql,sqls/LILACS_Sas_ingles.sql -outCsvFile=csv/lilacs_Sas.csv -jsonFieldFile=conf/jsonFields.txt -splitDocumentField=title
 
 cd - || exit

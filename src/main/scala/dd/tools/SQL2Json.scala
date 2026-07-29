@@ -34,6 +34,7 @@ object SQL2Json:
       |	                        For mapped SQL columns, object fields are extracted from the JSON content and emitted with the configured new field names.
       |	                        When <new field name> is omitted, the SQL column name is used as the output field name.
       |	                        Missing JSON fields are ignored. JSON array values are grouped with '//@//'; arrays of non-objects keep the SQL column name.
+      |	[-splitDocumentField=<name>] JSON-array field whose occurrences are emitted as separate JSON records.
       |	[-sqlEncoding=<str>]    SQL file character encoding. Default is 'utf-8'""".stripMargin
 
   /**
@@ -70,7 +71,8 @@ object SQL2Json:
         sqlEncoding = parameters.getOrElse("sqlEncoding", "utf-8"),
         jsonFields = jFields,
         repetitiveFields = None,
-        repetitiveSep = None
+        repetitiveSep = None,
+        splitDocumentField = parameters.get("splitDocumentField").filter(_.nonEmpty)
       )
       _ <- exportRecords(conf, sqlFiles, parameters("outJsonFile"))
     yield ()
