@@ -35,6 +35,7 @@ object SQL2Lucene:
       |	                        For mapped SQL columns, object fields are extracted from the JSON content and emitted with the configured new field names.
       |	                        When <new field name> is omitted, the SQL column name is used as the output field name.
       |	                        Missing JSON fields are ignored. JSON array values are grouped with '//@//'; arrays of non-objects keep the SQL column name.
+      |	[-splitDocumentField=<name>] JSON-array field whose occurrences are emitted as separate Lucene documents.
       |	[-sqlEncoding=<str>]    SQL file character encoding. Default is 'utf-8'
       |	[-repetitiveField=<name>[,<name>,...,<name>]] Fields split into multiple documents when repetitiveSep is found.
       |	[-repetitiveSep=<str>]  Separator used by repetitiveField. Default is '//@//'.
@@ -73,6 +74,7 @@ object SQL2Lucene:
       _ <- validateFieldToIndex(importFields, fieldToIndex)
       repetitiveFields = parseRepetitiveFields(parameters.get("repetitiveField"))
       repetitiveSep = parameters.get("repetitiveSep").orElse(repetitiveFields.map(_ => "//@//"))
+      splitDocumentField = parameters.get("splitDocumentField").filter(_.nonEmpty)
       conf = MySqlProducerConfig(
         mySqlHost = parameters("mySqlHost"),
         mySqlPort = parameters.getOrElse("mySqlPort", "3306").toInt,
@@ -83,7 +85,8 @@ object SQL2Lucene:
         sqlEncoding = parameters.getOrElse("sqlEncoding", "utf-8"),
         jsonFields = jsonFields,
         repetitiveFields = repetitiveFields,
-        repetitiveSep = repetitiveSep
+        repetitiveSep = repetitiveSep,
+        splitDocumentField = splitDocumentField
       )
       _ <- indexRecords(conf, parameters("index"), fieldToIndex, importFields)
     yield ()

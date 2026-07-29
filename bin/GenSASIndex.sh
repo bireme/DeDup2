@@ -13,6 +13,6 @@ if [ -f /bases/fiadmin2/exec/settings/dedup.inc ]; then
   . /bases/fiadmin2/exec/settings/dedup.inc
 fi
 
-bin/MySQL2Lucene.sh -mySqlHost=$mysqlserver -mySqlPort=$mysqlport -mySqlUser=$servername -mySqlPassword=$serverpassword -mySqlDbname=$serverdatabase -sqlfs=sqls/LILACS_Sas.sql,sqls/LILACS_Sas_ingles.sql -index=indexes/LILACS_Sas -fieldToIndex=title -jsonFieldFile=conf/jsonFields.txt
+bin/MySQL2Lucene.sh -mySqlHost=$mysqlserver -mySqlPort=$mysqlport -mySqlUser=$servername -mySqlPassword=$serverpassword -mySqlDbname=$serverdatabase -sqlfs=sqls/LILACS_Sas.sql,sqls/LILACS_Sas_ingles.sql -index=indexes/LILACS_Sas -fieldToIndex=title -jsonFieldFile=conf/jsonFields.txt -splitDocumentField=title
 
 cd - || exit

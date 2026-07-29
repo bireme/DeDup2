@@ -29,6 +29,7 @@ if [ "$#" -lt "7" ]
     echo '	                        For mapped SQL columns, object fields are extracted from the JSON content and emitted with the configured new field names.'
     echo '	                        When <new field name> is omitted, the SQL column name is used as the output field name.'
     echo '	                        Missing JSON fields are ignored. JSON array values are grouped with '//@//'; arrays of non-objects keep the SQL column name.'
+    echo '	[-splitDocumentField=<name>] JSON-array field whose occurrences are emitted as separate Lucene documents.'
     echo '	[-sqlEncoding=<str>]    SQL file character encoding. Default is "utf-8"'
     echo '	[-repetitiveField=<name>[,<name>,...,<name>]] Fields split into multiple documents when repetitiveSep is found.'
     echo '	[-repetitiveSep=<str>]  Separator used by repetitiveField. Default is "//@//".'
@@ -38,7 +39,8 @@ fi
 
 cd /home/javaapps/sbt-projects/DeDup2 || exit
 
-sbt "runMain dd.tools.SQL2Lucene $1 $2 $3 $4 $5 $6 $7 $8 $9 ${10} ${11} ${12} ${13}"
+printf -v quoted_args ' %q' "$@"
+sbt "runMain dd.tools.SQL2Lucene$quoted_args"
 
 if [ "$?" -ne 0 ]; then
   echo 'Pipe file generation error'

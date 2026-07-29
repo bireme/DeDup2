@@ -25,13 +25,14 @@ if [ "$#" -lt "7" ]
     echo "	                        For mapped SQL columns, object fields are extracted from the JSON content and emitted with the configured new field names."
     echo "	                        When <new field name> is omitted, the SQL column name is used as the output field name."
     echo "	                        Missing JSON fields are ignored. JSON array values are grouped with '//@//'; arrays of non-objects keep the SQL column name."
+    echo "	[-splitDocumentField=<name>] JSON-array field whose occurrences are emitted as separate CSV records."
     echo "	[-sqlEncoding=<str>]    SQL file character encoding. Default is 'utf-8'"
     exit 1
 fi
 
 cd /home/javaapps/sbt-projects/DeDup2 || exit
 
-sbt "runMain dd.tools.SQL2CSV '$1' '$2' '$3' '$4' '$5' '$6' '$7' '$8' '$9' '${10}'"
+printf -v quoted_args ' %q' "$@"
+sbt "runMain dd.tools.SQL2CSV$quoted_args"
 
 cd - || exit
-
