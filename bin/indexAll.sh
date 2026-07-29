@@ -8,10 +8,10 @@ export JAVA_HOME=$JAVA_HOME_25
 export PATH=$JAVA_HOME/bin:$PATH
 
 # Obtém o nome de usuário efetivo, mesmo se $USER não estiver definido
-if [[ "$(id -un)" != "operacao" ]]; then
-  echo "Este script só pode ser executado pelo usuário 'operacao'."
-  exit 1
-fi
+#if [[ "$(id -un)" != "operacao" ]]; then
+#  echo "Este script só pode ser executado pelo usuário 'operacao'."
+#  exit 1
+#fi
 
 
 # -----------------------------------------------------------
@@ -43,15 +43,19 @@ echo ""
 
 # -------------------------------------------------------------------------- #
 # Ajustando variaveis para processamento
+PROJECT_DIR=/home/javaapps/sbt-projects/DeDup2/
 if [ -f /bases/fiadmin2/exec/settings/dedup.inc ]; then
   . /bases/fiadmin2/exec/settings/dedup.inc
+elif [ -f "$PROJECT_DIR/dedup.inc" ]; then
+  DEDUP_VALIDATE_PATHS=0
+  . "$PROJECT_DIR/dedup.inc"
+  unset DEDUP_VALIDATE_PATHS
 fi
 
 # -------------------------------------------------------------------------- #
 
 # diretorio inicial
 INITIAL_DIR=$PWD
-PROJECT_DIR=/home/javaapps/sbt-projects/DeDup2/
 
 # vai para o diretório onde serão gerados os índices
 cd $PROJECT_DIR || exit
@@ -59,12 +63,12 @@ checkError "$?"  "vai para o diretorio base do processamento dos indices"
 
 # processa os indices
 tuplas=(
-  "LILACS_Sas.sql LILACS_Sas_ingles.sql lilacs_Sas LILACS_Sas_Seven.cfg"
+  "LILACS_Sas.sql LILACS_Sas_ingles.sql LILACS_Sas LILACS_Sas_Seven.cfg"
   "LIS.sql LIS LIS_Two.cfg"
-  "LILACS_MNT.sql LILACS_MNT_ingles.sql lilacs_MNT LILACS_MNT_Four.cfg"
-  "LILACS_MNTam.sql LILACS_MNTam_ingles.sql lilacs_MNTam LILACS_MNTam_Five.cfg"
+  "LILACS_MNT.sql LILACS_MNT_ingles.sql LILACS_MNT LILACS_MNT_Six.cfg"
+  "LILACS_MNTam.sql LILACS_MNTam_ingles.sql LILACS_MNTam LILACS_MNTam_Five.cfg"
   "DIREV.sql DIREV DIREV_Three.cfg"
-  "LILACS_Sas_Source.sql lilacs_Sas_Source LILACS_Sas_Source.cfg"
+  "LILACS_Sas_Source.sql LILACS_Sas_Source LILACS_Sas_Source.cfg"
 )
 
 # Geração dos índices a partir do MySql
