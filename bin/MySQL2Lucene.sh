@@ -39,7 +39,7 @@ fi
 
 cd /home/javaapps/sbt-projects/DeDup2 || exit
 
-printf -v quoted_args ' %q' "$@"
+printf -v quoted_args " '%s'" "$@"
 sbt "runMain dd.tools.SQL2Lucene$quoted_args"
 
 if [ "$?" -ne 0 ]; then
