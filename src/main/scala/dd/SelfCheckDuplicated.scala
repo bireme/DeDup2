@@ -84,7 +84,8 @@ object SelfCheckDuplicated:
           (document, ex) =>
             Console.err.println(s"Processing similars error. msg=${ex.toString} doc=${document.toString}")
             ex.printStackTrace()
-            Success(())
+            Success(()),
+          heuristic = config.heuristic
         )
       _ = println("OK")
     yield ()
