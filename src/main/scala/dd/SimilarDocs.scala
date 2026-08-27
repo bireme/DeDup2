@@ -30,8 +30,8 @@ class SimilarDocs private[dd] (config: SimilarDocsConfig):
                        heuristic: Option[Heuristics] = None) =
     this(
       SimilarDocsConfig(
-        producer = new DocsProducer:
-          override def getDocuments: LazyList[Document] = LazyList.empty,
+        producer = new DocsProducer {
+          override def getDocuments: LazyList[Document] = LazyList.empty },
         finder = finder,
         comparators = filters,
         reporters = reporters.map(reporter => ConfiguredReporter(reporter, otherFields)),
