@@ -2,7 +2,8 @@ package dd.configurators
 
 import dd.comparators.{AuthorsComparator, DiceComparator, ExactComparator, NGramComparator, RegexComparator}
 import dd.finders.LuceneDocsFinder
-import dd.interfaces.{Comparator, DocsFinder, DocsProducer, Reporter}
+import dd.heuristics.LilacsSasHeuristic
+import dd.interfaces.{Comparator, DocsFinder, DocsProducer, Heuristics, Reporter}
 import dd.producers.{CSVProducer, JsonProducer, MongoDBProducer, MongoDBProducerConfig, MySqlProducerConfig, MysqlProducer}
 import dd.reporters.{JsonReporter, LuceneReporter, MongoDBReporter, PipeReporter}
 import play.api.libs.json.{JsArray, JsLookupResult, JsObject, JsValue, Json}
@@ -37,6 +38,7 @@ object ConfMain:
    * @param finder finder used to retrieve candidate documents
    * @param comparators comparison filters applied to each document pair
    * @param reporters reporters notified for accepted comparison results
+   * @param heuristic optional duplicate heuristic used to filter candidate documents
    * @param auxQuery optional auxiliary query passed to the finder
    * @param maxDocs optional maximum number of candidate documents per source document
    * @param documentParallelism maximum number of source documents processed concurrently
@@ -47,7 +49,8 @@ object ConfMain:
                                reporters: Seq[ConfiguredReporter],
                                auxQuery: Option[String],
                                maxDocs: Option[Int],
-                               documentParallelism: Int = Runtime.getRuntime.availableProcessors().max(1))
+                               documentParallelism: Int = Runtime.getRuntime.availableProcessors().max(1),
+                               heuristic: Option[Heuristics] = None)
 
   /**
    * Parsed CSV producer settings that can be reused without instantiating a producer.
@@ -91,6 +94,7 @@ object ConfMain:
    * @param minSimilarity minimum normalized n-gram similarity accepted by the Lucene finder
    * @param comparators comparison filters applied to each document pair
    * @param reporters reporters notified for accepted comparison results
+   * @param heuristic optional duplicate heuristic used to filter candidate documents
    * @param auxQuery optional auxiliary query passed to the finder
    * @param maxDocs optional maximum number of candidate documents per source document
    * @param documentParallelism maximum number of source documents processed concurrently
@@ -108,9 +112,14 @@ object ConfMain:
                                        documentParallelism: Int,
                                        csvEncoding: String,
                                        outCsvFile: Option[String],
-                                       index: Option[String])
+                                       index: Option[String],
+                                       heuristic: Option[Heuristics] = None)
 
   private val requiredReportFields: Seq[String] = Seq("dbase", "id")
+  private val heuristicFactories: Map[String, () => Heuristics] = Map(
+    "LilacsSasHeuristic" -> (() => new LilacsSasHeuristic),
+    "dd.heuristics.LilacsSasHeuristic" -> (() => new LilacsSasHeuristic)
+  )
 
   /**
    * Parses the application configuration.
@@ -212,6 +221,8 @@ object ConfMain:
         .map(parseConfiguredReporters(_, jsonStr))
         .getOrElse(throw new IllegalArgumentException(s"Missing valid reporters: $jsonStr"))
 
+    val heuristic: Option[Heuristics] = parseHeuristic(json)
+
     val lucene: JsLookupResult = json \ "finder" \ "lucene"
     SimilarDocsConfig(
       producer = producer,
@@ -220,7 +231,8 @@ object ConfMain:
       reporters = reporters,
       auxQuery = (lucene \ "auxQuery").asOpt[String].filter(_.nonEmpty),
       maxDocs = (lucene \ "maxDocs").asOpt[Int],
-      documentParallelism = parseDocumentParallelism(json)
+      documentParallelism = parseDocumentParallelism(json),
+      heuristic = heuristic
     )
 
   /**
@@ -252,6 +264,8 @@ object ConfMain:
         .map(parseConfiguredReporters(_, jsonStr))
         .getOrElse(throw new IllegalArgumentException(s"Missing valid reporters: $jsonStr"))
 
+    val heuristic: Option[Heuristics] = parseHeuristic(json)
+
     val selfCheck: JsLookupResult = json \ "selfCheckDuplicated"
     SelfCheckDuplicatedConfig(
       source = source,
@@ -264,8 +278,22 @@ object ConfMain:
       documentParallelism = parseDocumentParallelism(json),
       csvEncoding = (selfCheck \ "encoding").asOpt[String].filter(_.nonEmpty).getOrElse("utf-8"),
       outCsvFile = (selfCheck \ "outCsvFile").asOpt[String].filter(_.nonEmpty),
-      index = (selfCheck \ "index").asOpt[String].filter(_.nonEmpty)
+      index = (selfCheck \ "index").asOpt[String].filter(_.nonEmpty),
+      heuristic = heuristic
     )
+
+  /**
+   * Resolves the optional heuristic name configured at the document root.
+   *
+   * @param json raw application configuration
+   * @return the configured heuristic, or {@code None} when no name is present
+   */
+  private def parseHeuristic(json: JsValue): Option[Heuristics] =
+    (json \ "heuristic").asOpt[String].map(_.trim).filter(_.nonEmpty).map:
+      name =>
+        heuristicFactories.get(name) match
+          case Some(factory) => factory()
+          case None => throw new IllegalArgumentException(s"Unknown heuristic: $name")
 
   /**
    * Parses the Lucene search field and comparator definitions from raw JSON.
@@ -297,7 +325,7 @@ object ConfMain:
    */
   private def parseProducer(json: JsObject,
                             jsonStr: String): DocsProducer =
-    val map = json.value
+    val map: collection.Map[String, JsValue] = json.value
     if map.contains("csv") then parseCSVProducer(map("csv").as[JsObject])
     else if map.contains("json") then parseJsonProducer(map("json").as[JsObject])
     else if map.contains("mysql") then parseMysqlProducer(map("mysql").as[JsObject])
@@ -312,7 +340,7 @@ object ConfMain:
    * @return configured CSV producer
    */
   private def parseCSVProducer(json: JsObject): CSVProducer =
-    val config = parseCSVProducerConfig(json)
+    val config: CsvProducerConfig = parseCSVProducerConfig(json)
     new CSVProducer(
       csv = config.csvFile,
       schema = config.schema,
@@ -332,8 +360,8 @@ object ConfMain:
    */
   private def parseCSVProducerConfig(json: JsObject): CsvProducerConfig =
     val map: collection.Map[String, JsValue] = json.value
-    val schemaContent = readSchema(requiredString(map, "schema").trim)
-    val schema = parseSchema(schemaContent)
+    val schemaContent: String = readSchema(requiredString(map, "schema").trim)
+    val schema: Map[Int, String] = parseSchema(schemaContent)
     requireSchemaFields(schema)
 
     CsvProducerConfig(
@@ -439,7 +467,7 @@ object ConfMain:
    * @return parsed self-check source configuration
    */
   private def parseSelfCheckSource(json: JsObject): SelfCheckSourceConfig =
-    val map = json.value
+    val map: collection.Map[String, JsValue] = json.value
     if map.contains("mysql") then SelfCheckMysqlSourceConfig(parseMysqlProducerConfig(map("mysql").as[JsObject]))
     else if map.contains("csv") then SelfCheckCsvSourceConfig(parseCSVProducerConfig(map("csv").as[JsObject]))
     else throw new IllegalArgumentException("SelfCheckDuplicated requires 'producer/mysql' or 'producer/csv'")
@@ -459,7 +487,7 @@ object ConfMain:
     )
 
   private def parseLuceneMinSimilarity(lucene: JsLookupResult): Double =
-    val value = (lucene \ "minSimilarity").asOpt[Double]
+    val value: Double = (lucene \ "minSimilarity").asOpt[Double]
       .getOrElse(throw new IllegalArgumentException("Missing 'finder/lucene/minSimilarity'"))
     if value < 0.0 || value > 1.0 then
       throw new IllegalArgumentException("'finder/lucene/minSimilarity' must be between 0.0 and 1.0")

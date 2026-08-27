@@ -6,6 +6,7 @@ import org.apache.commons.csv.{CSVFormat, CSVParser, CSVRecord}
 import java.io.{Reader, StringReader}
 import java.nio.charset.Charset
 import java.nio.file.{Files, InvalidPathException, Path}
+import scala.annotation.tailrec
 import scala.jdk.CollectionConverters.IteratorHasAsScala
 import scala.util.{Failure, Success, Try, Using}
 
@@ -93,6 +94,7 @@ class CSVProducer(csv: String,
    * @param iterator remaining CSV records to transform
    * @return next successfully converted document when available
    */
+  @tailrec
   private def nextDocument(schema: Map[Int, String],
                            iterator: Iterator[CSVRecord]): Option[Document] =
     if !iterator.hasNext then None

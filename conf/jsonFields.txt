@@ -1,0 +1,5 @@
+author=text
+title=text
+title_monographic=text
+pages=_e
+pages=_f

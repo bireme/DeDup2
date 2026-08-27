@@ -83,19 +83,14 @@ class PipeReporter(writer: Writer,
                              currentDoc: Document,
                              otherFields: Seq[String]): Seq[String] =
     /**
-     * Collects the requested field values from the document.
-     *
-     * @param doc document to insert or serialize
-     * @return serialized field values extracted from the document
-     */
-    /**
      * Collects and joins all values for a requested field.
      *
      * @param doc document that provides the field values
      * @param oField field name to collect
      * @return joined field value, or the empty string when absent
      */
-    def collectField(doc: Document, oField: String): String =
+    def collectField(doc: Document,
+                     oField: String): String =
       doc.fields.filter(_._1.equals(oField)).map(_._2).mkString(fieldSeparator)
 
     otherFields.flatMap:

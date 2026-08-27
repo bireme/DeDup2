@@ -1,0 +1,14 @@
+0=database
+1=id
+2=titulo_artigo
+3=titulo_revista
+4=ano_publicacao
+5=volume_fasciculo
+6=numero_fasciculo
+7=autores
+8=pagina_inicial
+9=centro_colaborador
+10=tipo_literatura
+11=nivel_de_tratamento
+12=endereco_eletronico
+13=link_fiadmin
