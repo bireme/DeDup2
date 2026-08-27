@@ -4,14 +4,14 @@ version := "0.1"
 
 scalaVersion := "3.8.4"
 
-val luceneVersion = "10.5.0"
+val luceneVersion = "10.5.1"
 val commonsCVSVersion = "1.14.1"
 val playJsonVersion = "3.1.0-M10"
-val mysqlConnectorJVersion = "9.7.0"
-val mongoVersion = "5.9.1"
-val munitVersion = "1.3.4"
+val mysqlConnectorJVersion = "26.7.0"
+val mongoVersion = "5.10.0"
+val munitVersion = "1.3.5"
 val oxVersion = "1.0.6"
-val jettyVersion = "12.1.11"
+val jettyVersion = "12.1.12"
 
 libraryDependencies ++= Seq(
   "org.apache.lucene" % "lucene-analysis-common" % luceneVersion,

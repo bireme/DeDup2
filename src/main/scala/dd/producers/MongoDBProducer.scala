@@ -2,7 +2,7 @@ package dd.producers
 
 import com.mongodb.client.{FindIterable, MongoClient, MongoClients, MongoCollection, MongoCursor}
 import dd.interfaces.{DocsProducer, Document}
-import org.bson.{Document as BsonDocument}
+import org.bson.Document as BsonDocument
 
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success, Try}

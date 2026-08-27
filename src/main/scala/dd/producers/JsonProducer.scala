@@ -4,6 +4,7 @@ import dd.interfaces.{DocsProducer, Document}
 import play.api.libs.json.{JsArray, JsBoolean, JsNull, JsNumber, JsObject, JsString, JsValue, Json}
 
 import java.nio.file.{Files, Path}
+import scala.annotation.tailrec
 import scala.io.Source
 import scala.util.{Failure, Success, Try, Using}
 
@@ -61,6 +62,7 @@ class JsonProducer(input: String,
    * @param iterator remaining JSON values to transform
    * @return next successfully converted document when available
    */
+  @tailrec
   private def nextDocument(iterator: Iterator[JsValue]): Option[Document] =
     if !iterator.hasNext then None
     else
@@ -98,8 +100,8 @@ private[producers] object JsonProducer:
    * @param encoding file character encoding
    * @return raw JSON content
    */
-  def readInput(input: String,
-                encoding: String): String =
+  private def readInput(input: String,
+                        encoding: String): String =
     val maybePath = Try(Path.of(input)).toOption
     maybePath.filter(Files.exists(_)) match
       case Some(path) =>

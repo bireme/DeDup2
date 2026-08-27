@@ -3,8 +3,8 @@ package dd
 import dd.comparators.DiceComparator
 import dd.configurators.ConfMain
 import dd.configurators.ConfMain.{ConfiguredReporter, SimilarDocsConfig}
-import dd.interfaces.{CompResult, Comparator, DocsFinder, DocsProducer, Document, Reporter}
-import ox.{forkUser, par, supervised}
+import dd.interfaces.{CompResult, Comparator, DocsFinder, DocsProducer, Document, Heuristics, Reporter}
+import ox.{Fork, forkUser, par, supervised}
 
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
@@ -26,7 +26,8 @@ class SimilarDocs private[dd] (config: SimilarDocsConfig):
                        reporters: Seq[Reporter],
                        auxQuery: Option[String],
                        maxDocs: Option[Int],
-                       otherFields: Seq[String]) =
+                       otherFields: Seq[String],
+                       heuristic: Option[Heuristics] = None) =
     this(
       SimilarDocsConfig(
         producer = new DocsProducer:
@@ -35,7 +36,8 @@ class SimilarDocs private[dd] (config: SimilarDocsConfig):
         comparators = filters,
         reporters = reporters.map(reporter => ConfiguredReporter(reporter, otherFields)),
         auxQuery = auxQuery,
-        maxDocs = maxDocs
+        maxDocs = maxDocs,
+        heuristic = heuristic
       )
     )
 
@@ -54,45 +56,48 @@ class SimilarDocs private[dd] (config: SimilarDocsConfig):
    * @return result of processing all configured source documents
    */
   def run(): Try[Unit] =
-    closeAfter(processDocuments(config.producer.getDocuments))
+    closeAfter(processDocuments(config.producer.getDocuments, heuristic = config.heuristic))
 
   private[dd] def processDocuments(
       docs: LazyList[Document],
-      recoverDocumentError: (Document, Throwable) => Try[Unit] = (_, exception) => Failure(exception)
+      recoverDocumentError: (Document, Throwable) => Try[Unit] = (_, exception) => Failure(exception),
+      heuristic: Option[Heuristics] = None
   ): Try[Unit] =
     Try:
       supervised:
-        val iterator = docs.iterator
-        val iteratorLock = new Object
-        val completed = AtomicInteger(0)
+        val iterator: Iterator[Document] = docs.iterator
+        val iteratorLock: Object = new Object
+        val completed: AtomicInteger = AtomicInteger(0)
 
         def nextDocument(): Option[Document] =
           iteratorLock.synchronized:
             if iterator.hasNext then Some(iterator.next()) else None
 
         def processWorker(): Unit =
-          var next = nextDocument()
+          var next: Option[Document] = nextDocument()
           while next.nonEmpty do
-            val document = next.get
-            processSimilars(document).recoverWith:
+            val document: Document = next.get
+            processSimilars(document, heuristic).recoverWith:
               case exception => recoverDocumentError(document, exception)
             .get
 
-            val pos = completed.incrementAndGet()
+            val pos: Int = completed.incrementAndGet()
             if pos % 1000 == 0 then println(s"+++$pos")
             next = nextDocument()
 
-        val workers = (1 to documentParallelism).map(_ => forkUser(processWorker()))
+        val workers: Seq[Fork[Unit]] = (1 to documentParallelism).map(_ => forkUser(processWorker()))
         workers.foreach(_.join())
 
   /**
    * Processes the similar documents for the given source document.
    *
    * @param originalDoc source document used in the comparison
+   * @param heuristic optional duplicate heuristic used to filter candidates
    * @return result of processing the matched documents
    */
-  def processSimilars(originalDoc: Document): Try[Unit] =
-    similar(originalDoc).flatMap:
+  def processSimilars(originalDoc: Document,
+                      heuristic: Option[Heuristics] = None): Try[Unit] =
+    similar(originalDoc, heuristic).flatMap:
       _.foldLeft(Try(())):
         case (acc, (currentDoc, results)) =>
           acc.flatMap(_ => notifyReporters(originalDoc, currentDoc, results))
@@ -102,7 +107,7 @@ class SimilarDocs private[dd] (config: SimilarDocsConfig):
    * @return result of closing the underlying resources
    */
   def close(): Try[Unit] =
-    val closeResults = finder.close() +: reporters.map(_.reporter.close())
+    val closeResults: Seq[Try[Unit]] = finder.close() +: reporters.map(_.reporter.close())
     closeResults.collectFirst:
       case Failure(exception) => Failure(exception)
     .getOrElse(Success(()))
@@ -111,9 +116,12 @@ class SimilarDocs private[dd] (config: SimilarDocsConfig):
    * Finds candidate documents and computes comparison results for them.
    *
    * @param originalDoc source document used in the search and comparison
+   * @param heuristic optional duplicate heuristic applied to compared
+   *                  candidate documents; when absent, all candidates remain
    * @return matched documents paired with their comparison results
    */
-  private def similar(originalDoc: Document): Try[LazyList[(Document, Seq[CompResult])]] =
+  private def similar(originalDoc: Document,
+                      heuristic: Option[Heuristics]): Try[LazyList[(Document, Seq[CompResult])]] =
     for
       searchField <- finder.getSearchField.toRight(IllegalArgumentException("Empty search field")).toTry
       query <- originalDoc.fields.collectFirst:
@@ -122,7 +130,12 @@ class SimilarDocs private[dd] (config: SimilarDocsConfig):
       producer <- maxDocs match
         case Some(value) => finder.findDocs(searchField, query, auxQuery, value)
         case None => finder.findDocs(searchField, query, auxQuery)
-    yield getResults(originalDoc, producer.getDocuments)
+    yield
+      val comparedDocuments: LazyList[(Document, Seq[CompResult])] = getResults(originalDoc, producer.getDocuments)
+      heuristic match
+        case None => comparedDocuments
+        case Some(value) => comparedDocuments.filter:
+          case (document, results) => value.isDuplicated(document, results)
 
   /**
    * Builds the comparison results for the provided documents.
@@ -144,7 +157,7 @@ class SimilarDocs private[dd] (config: SimilarDocsConfig):
    */
   private def getResults(originalDoc: Document,
                          currentDoc: Document): (Document, Seq[CompResult]) =
-    val results = par(filters.map(comparator => () => comparator.compare(originalDoc, currentDoc)))
+    val results: Seq[CompResult] = par(filters.map(comparator => () => comparator.compare(originalDoc, currentDoc)))
     (currentDoc, results)
 
   /**
@@ -177,8 +190,8 @@ class SimilarDocs private[dd] (config: SimilarDocsConfig):
    * @return result of the operation, preserving close failures when appropriate
    */
   private def closeAfter(operation: => Try[Unit]): Try[Unit] =
-    val operationResult = Try(operation).flatten
-    val closeResult = close()
+    val operationResult: Try[Unit] = Try(operation).flatten
+    val closeResult: Try[Unit] = close()
 
     operationResult match
       case Success(_) => closeResult

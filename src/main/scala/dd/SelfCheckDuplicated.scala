@@ -3,12 +3,13 @@ package dd
 import dd.configurators.ConfMain
 import dd.configurators.ConfMain.{ConfiguredReporter, SelfCheckCsvSourceConfig, SelfCheckDuplicatedConfig, SelfCheckMysqlSourceConfig, SimilarDocsConfig}
 import dd.finders.LuceneDocsFinder
-import dd.interfaces.{CompResult, Document, DocsProducer, Reporter}
+import dd.interfaces.{CompResult, DocsProducer, Document, Reporter}
 import dd.producers.CSVProducer
 import dd.tools.{CSV2Lucene, SQL2CSV}
 
 import java.io.File
 import java.nio.file.Files
+import scala.collection.mutable
 import scala.io.{Codec, Source}
 import scala.util.{Failure, Success, Try, Using}
 
@@ -169,7 +170,7 @@ object SelfCheckDuplicated:
    */
   private def schemaFromCsvHeader(csvFile: String,
                                   encoding: String): Try[Map[Int, String]] =
-    val header = Using(Source.fromFile(csvFile)(using Codec(encoding))):
+    val header: Try[String] = Using(Source.fromFile(csvFile)(using Codec(encoding))):
       source =>
         source.getLines()
           .find(_.trim.nonEmpty)
@@ -194,13 +195,13 @@ object SelfCheckDuplicated:
    */
   private def parseCsvLine(line: String): Try[Seq[String]] =
     Try:
-      val fields = Vector.newBuilder[String]
-      val current = new StringBuilder
-      var inQuotes = false
-      var index = 0
+      val fields: mutable.ReusableBuilder[String, Vector[String]] = Vector.newBuilder[String]
+      val current: StringBuilder = new StringBuilder
+      var inQuotes: Boolean = false
+      var index: Int = 0
 
       while index < line.length do
-        val char = line.charAt(index)
+        val char: Char = line.charAt(index)
         if inQuotes && char == '"' && index + 1 < line.length && line.charAt(index + 1) == '"' then
           current.append('"')
           index += 1
@@ -271,7 +272,8 @@ object SelfCheckDuplicated:
             ConfiguredReporter(SelfPairSkippingReporter(configured.reporter), configured.otherFields),
         auxQuery = config.auxQuery,
         maxDocs = config.maxDocs,
-        documentParallelism = config.documentParallelism
+        documentParallelism = config.documentParallelism,
+        heuristic = config.heuristic
       )
     )
 
