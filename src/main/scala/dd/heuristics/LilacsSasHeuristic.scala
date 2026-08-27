@@ -68,15 +68,15 @@ class LilacsSasHeuristic extends Heuristics:
               authorComp == 1.0)
         else
           equalAndPresent(volume._1, volume._2) &&
-            equalAndPresent(issue._1, issue._2) &&
-            equalAndPresent(pages._1, pages._2) &&
-            authorComp == 1.0
-      else if titleComp >= 0.8 && titleComp <= 0.9 then
-        present(journal._1) && present(journal._2) && journalsEqual &&
-          equalAndPresent(volume._1, volume._2) &&
           equalAndPresent(issue._1, issue._2) &&
           equalAndPresent(pages._1, pages._2) &&
           authorComp == 1.0
+      else if titleComp >= 0.8 && titleComp < 1.0 then
+        present(journal._1) && present(journal._2) && journalsEqual &&
+        equalAndPresent(volume._1, volume._2) &&
+        equalAndPresent(issue._1, issue._2) &&
+        equalAndPresent(pages._1, pages._2) &&
+        authorComp == 1.0
       else false
 
   /**
