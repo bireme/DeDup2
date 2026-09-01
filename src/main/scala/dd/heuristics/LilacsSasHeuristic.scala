@@ -1,6 +1,7 @@
 package dd.heuristics
 
 import dd.interfaces.{CompResult, Document, Heuristics}
+import dd.heuristics.Util.*
 
 /**
  * Applies the LILACS/Sas duplicate-detection rules to comparator results.
@@ -100,43 +101,3 @@ class LilacsSasHeuristic extends Heuristics:
     results.find(_.fieldName == fieldName)
       .map(result => (result.originalField, result.currentField))
       .getOrElse(("", ""))
-
-  /**
-   * Compares two field values after trimming surrounding whitespace.
-   *
-   * @param left first field value
-   * @param right second field value
-   * @return {@code true} when the normalized values are equal
-   */
-  private def equal(left: String, right: String): Boolean =
-    left.trim == right.trim
-
-  /**
-   * Checks that two values are present and equal.
-   *
-   * @param left first field value
-   * @param right second field value
-   * @return {@code true} when both values are present and equal
-   */
-  private def equalAndPresent(left: String, right: String): Boolean =
-    present(left) && present(right) && equal(left, right)
-
-  /**
-   * Checks whether both values are missing.
-   *
-   * @param left first field value
-   * @param right second field value
-   * @return {@code true} when both values are empty or {@code null}
-   */
-  private def missing(left: String, right: String): Boolean =
-    !present(left) && !present(right)
-
-  /**
-   * Determines whether a field value can participate in a comparison.
-   *
-   * @param value field value to inspect
-   * @return {@code false} for empty values or the marker {@code null}
-   */
-  private def present(value: String): Boolean =
-    val normalized = value.trim
-    normalized.nonEmpty && !normalized.equalsIgnoreCase("null")
