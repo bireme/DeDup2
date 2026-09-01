@@ -1,0 +1,17 @@
+
+Escreva um objeto (DirevHeuristic) em heuristics que recebe como parametro o caminho de um arquivo de entrada com valores separados por pipe e um caminho de um arquivo texto de saida.
+Defina constantes para as posicoes dos campos id1Pos, id2Pos, titlePos, date1Pos, date2Pos, url1Pos, url22Pos
+Para cada linha nao vazia do arquivo faça:
+    Cheque se o numero de campos é diferente de 7
+    Atribua às variáveis id1, id2, titleComp, date1, date2, url1, url2 os conteudos dos campos
+    A linhas será considerada 'duplicadas' se uma das regras abaixo for verdadeira e 'diferentes' caso contrario
+    Escreva no arquivo de saída uma linha com o formato:  <id1>|<id2>|<status>   onde <status> é 'duplicadas' ou 'diferentes'
+
+
+Regras:
+
+1) Se titulos da série são idênticos (valor do campo titleComp = 1.0)
+  A) url1 e url2 são iguais e diferentes de null
+
+2) Se titulos são parecidos (0.7 <= sim < 1.0)
+  A) dates e urls são iguais entre si e diferentes de null

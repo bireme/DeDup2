@@ -2,7 +2,7 @@ package dd.configurators
 
 import dd.comparators.{AuthorsComparator, DiceComparator, ExactComparator, NGramComparator, RegexComparator}
 import dd.finders.LuceneDocsFinder
-import dd.heuristics.LilacsSasHeuristic
+import dd.heuristics.{DirevHeuristic, LilacsMntHeuristic, LilacsMntamHeuristic, LilacsSasHeuristic, LilacsSasSourceHeuristic, LisHeuristic}
 import dd.interfaces.{Comparator, DocsFinder, DocsProducer, Heuristics, Reporter}
 import dd.producers.{CSVProducer, JsonProducer, MongoDBProducer, MongoDBProducerConfig, MySqlProducerConfig, MysqlProducer}
 import dd.reporters.{JsonReporter, LuceneReporter, MongoDBReporter, PipeReporter}
@@ -118,7 +118,17 @@ object ConfMain:
   private val requiredReportFields: Seq[String] = Seq("dbase", "id")
   private val heuristicFactories: Map[String, () => Heuristics] = Map(
     "LilacsSasHeuristic" -> (() => new LilacsSasHeuristic),
-    "dd.heuristics.LilacsSasHeuristic" -> (() => new LilacsSasHeuristic)
+    "dd.heuristics.LilacsSasHeuristic" -> (() => new LilacsSasHeuristic),
+    "DirevHeuristic" -> (() => new DirevHeuristic),
+    "dd.heuristics.DirevHeuristic" -> (() => new DirevHeuristic),
+    "LisHeuristic" -> (() => new LisHeuristic),
+    "dd.heuristics.LisHeuristic" -> (() => new LisHeuristic),
+    "LilacsSasSourceHeuristic" -> (() => new LilacsSasSourceHeuristic),
+    "dd.heuristics.LilacsSasSourceHeuristic" -> (() => new LilacsSasSourceHeuristic),
+    "LilacsMntHeuristic" -> (() => new LilacsMntHeuristic),
+    "dd.heuristics.LilacsMntHeuristic" -> (() => new LilacsMntHeuristic),
+    "LilacsMntamHeuristic" -> (() => new LilacsMntamHeuristic),
+    "dd.heuristics.LilacsMntamHeuristic" -> (() => new LilacsMntamHeuristic)
   )
 
   /**
