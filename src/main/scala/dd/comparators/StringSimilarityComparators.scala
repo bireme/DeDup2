@@ -1,7 +1,6 @@
 package dd.comparators
 
 import dd.interfaces.{CompResult, Comparator, Document}
-import dd.tools.StringSimilarity.{Jaccard, Levenshtein, LevenshteinJaccard}
 import dd.tools.Tools
 
 /** Common comparator implementation for configurable string similarities. */
@@ -17,7 +16,6 @@ abstract class StringSimilarityComparator(val fieldName: String,
 
   /** Calculates the similarity of two prepared field values. */
   protected def similarity(left: String, right: String): Double
-
   /**
    * Normalizes a field before calculating similarity.
    *
@@ -45,39 +43,3 @@ abstract class StringSimilarityComparator(val fieldName: String,
     CompResult(comparatorName, fieldName, original, current,
       Some(normalizedOriginal), Some(normalizedCurrent), score,
       !bothEmpty && score >= minSimilarity)
-
-/** Comparator based on normalized Levenshtein similarity. */
-class LevenshteinComparator(fieldName: String,
-                            normalize: Boolean,
-                            minSimilarity: Double)
-    extends StringSimilarityComparator(fieldName, normalize, minSimilarity):
-  protected val comparatorName: String = "LevenshteinComparator"
-
-  protected def similarity(left: String, right: String): Double =
-    Levenshtein.score(left, right)
-
-/** Comparator based on Jaccard similarity of distinct words. */
-class JaccardComparator(fieldName: String,
-                        normalize: Boolean,
-                        minSimilarity: Double)
-    extends StringSimilarityComparator(fieldName, normalize, minSimilarity):
-  protected val comparatorName: String = "JaccardComparator"
-
-  override protected def normalizeValue(value: String): String =
-    if normalize then Tools.normalizeWordsStr(value) else value
-
-  protected def similarity(left: String, right: String): Double =
-    Jaccard.score(left, right)
-
-/** Comparator based on weighted Levenshtein and word-Jaccard similarity. */
-class LevenshteinJaccardComparator(fieldName: String,
-                                   normalize: Boolean,
-                                   minSimilarity: Double)
-    extends StringSimilarityComparator(fieldName, normalize, minSimilarity):
-  protected val comparatorName: String = "LevenshteinJaccardComparator"
-
-  override protected def normalizeValue(value: String): String =
-    if normalize then Tools.normalizeWordsStr(value) else value
-
-  protected def similarity(left: String, right: String): Double =
-    LevenshteinJaccard.score(left, right)

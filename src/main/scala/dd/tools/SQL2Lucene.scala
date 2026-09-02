@@ -262,6 +262,7 @@ object SQL2Lucene:
     importFields match
       case Some(selectedFields) =>
         new DocsProducer:
+          /** Returns documents restricted to the configured import fields. */
           override def getDocuments: LazyList[Document] =
             producer.getDocuments.map:
               document =>

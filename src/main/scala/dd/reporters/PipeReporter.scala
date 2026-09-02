@@ -143,6 +143,7 @@ class PipeReporter(writer: Writer,
         flushIfRequested()
   }
 
+  /** Flushes the writer when immediate output was requested. */
   private def flushIfRequested(): Unit =
     if flushResults then writer.flush()
 

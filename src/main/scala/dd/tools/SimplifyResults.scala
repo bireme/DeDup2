@@ -67,9 +67,11 @@ object SimplifyResults:
       total <- simplify(config)
     yield total
 
+  /** Parses command-line options for the simplification tool. */
   private def parseArgs(args: Array[String]): Try[Map[String, String]] =
     Tools.parseCommandLineArgs(args)
 
+  /** Builds the simplification configuration from parsed options. */
   private def parseConfig(parameters: Map[String, String]): Try[Config] =
     for
       host <- required(parameters, "mongodbHost")
@@ -88,24 +90,28 @@ object SimplifyResults:
       append = parameters.contains("append")
     )
 
+  /** Reads a required command-line parameter. */
   private def required(parameters: Map[String, String],
                        name: String): Try[String] =
     parameters.get(name).filter(_.trim.nonEmpty).map(_.trim) match
       case Some(value) => Success(value)
       case None => Failure(IllegalArgumentException(usageMessage))
 
+  /** Reads the first available parameter from a list of aliases. */
   private def requiredAny(parameters: Map[String, String],
                           names: String*): Try[String] =
     names.iterator.flatMap(name => parameters.get(name).map(_.trim).filter(_.nonEmpty)).toSeq.headOption match
       case Some(value) => Success(value)
       case None => Failure(IllegalArgumentException(usageMessage))
 
+  /** Parses a positive MongoDB port number. */
   private def parsePort(value: String): Try[Int] =
     Try(value.toInt).flatMap:
       port =>
         if port > 0 then Success(port)
         else Failure(IllegalArgumentException(s"Invalid mongodbPort [$value]. Expected a positive integer."))
 
+  /** Copies source documents after simplifying comparison result fields. */
   private def simplify(config: Config): Try[Long] =
     val uri = s"mongodb://${config.host}:${config.port}"
     val client = MongoClients.create(uri)
@@ -123,6 +129,7 @@ object SimplifyResults:
       copySimplified(source, destination)
     finally client.close()
 
+  /** Copies a MongoDB collection in batches using the simplification function. */
   private def copySimplified(source: MongoCollection[Document],
                              destination: MongoCollection[Document]): Try[Long] =
     val cursor = source.find().iterator()
@@ -140,6 +147,7 @@ object SimplifyResults:
       flush(destination, buffer).map(_ => total)
     finally closeCursor(cursor)
 
+  /** Removes internal fields and normalizes similarity values in a document. */
   private[tools] def simplifyDocument(source: Document): Document =
     source.entrySet().asScala.foldLeft(new Document()):
       case (destination, entry) =>
@@ -151,15 +159,18 @@ object SimplifyResults:
         else if isObject(value) then destination.append(key, simplifiedSimilarityValue(value))
         else destination.append(key, value)
 
+  /** Indicates whether a MongoDB field is internal to the workflow. */
   private def ignoredField(key: String): Boolean =
     key == "_id" || key == "dbase_1" || key == "dbase_2"
 
+  /** Checks whether a value is a MongoDB document or map. */
   private def isObject(value: Any): Boolean =
     value match
       case _: Document => true
       case _: java.util.Map[?, ?] => true
       case _ => false
 
+  /** Simplifies a nested similarity result when it is an object. */
   private def simplifiedSimilarityValue(value: Any): Any =
     val isSimilar = value match
       case document: Document => Option(document.get("isSimilar"))
@@ -168,12 +179,14 @@ object SimplifyResults:
 
     isSimilar.map(normalizeSimilarityValue).getOrElse("?")
 
+  /** Extracts the similarity value from a nested result object. */
   private def similarityValue(value: Any): Any =
     value match
       case document: Document => Option(document.get("similarity")).getOrElse("")
       case map: java.util.Map[?, ?] => Option(map.get("similarity")).getOrElse("")
       case _ => ""
 
+  /** Converts a similarity value to its compact output form. */
   private def normalizeSimilarityValue(value: Any): Any =
     value match
       case boolean: java.lang.Boolean => if boolean then 1 else 0
@@ -185,6 +198,7 @@ object SimplifyResults:
           case _ => "?"
       case _ => "?"
 
+  /** Writes and clears the pending MongoDB document batch. */
   private def flush(destination: MongoCollection[Document],
                     buffer: mutable.Buffer[Document]): Try[Unit] =
     Try:
@@ -192,5 +206,6 @@ object SimplifyResults:
         destination.insertMany(buffer.asJava, new InsertManyOptions().ordered(false))
         buffer.clear()
 
+  /** Closes a MongoDB cursor while ignoring cleanup failures. */
   private def closeCursor(cursor: MongoCursor[Document]): Unit =
     Try(cursor.close())

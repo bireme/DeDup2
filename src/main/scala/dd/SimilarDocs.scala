@@ -18,9 +18,11 @@ import scala.util.{Failure, Success, Try}
  * and reporter-specific output fields.
  */
 class SimilarDocs private[dd] (config: SimilarDocsConfig):
+  /** Creates a similarity pipeline from a JSON configuration file. */
   def this(configFile: File) =
     this(ConfMain.parseSimilarDocsConfig(configFile).get)
 
+  /** Creates a similarity pipeline from its runtime collaborators. */
   private[dd] def this(finder: DocsFinder,
                        filters: Seq[Comparator],
                        reporters: Seq[Reporter],
@@ -31,6 +33,7 @@ class SimilarDocs private[dd] (config: SimilarDocsConfig):
     this(
       SimilarDocsConfig(
         producer = new DocsProducer {
+          /** Returns no source documents for the finder-only constructor. */
           override def getDocuments: LazyList[Document] = LazyList.empty },
         finder = finder,
         comparators = filters,
@@ -58,6 +61,7 @@ class SimilarDocs private[dd] (config: SimilarDocsConfig):
   def run(): Try[Unit] =
     closeAfter(processDocuments(config.producer.getDocuments, heuristic = config.heuristic))
 
+  /** Processes the source documents with the configured worker parallelism. */
   private[dd] def processDocuments(
       docs: LazyList[Document],
       recoverDocumentError: (Document, Throwable) => Try[Unit] = (_, exception) => Failure(exception),
@@ -69,10 +73,12 @@ class SimilarDocs private[dd] (config: SimilarDocsConfig):
         val iteratorLock: Object = new Object
         val completed: AtomicInteger = AtomicInteger(0)
 
+        /** Returns the next document from the shared input iterator. */
         def nextDocument(): Option[Document] =
           iteratorLock.synchronized:
             if iterator.hasNext then Some(iterator.next()) else None
 
+        /** Processes documents until the shared iterator is exhausted. */
         def processWorker(): Unit =
           var next: Option[Document] = nextDocument()
           while next.nonEmpty do
@@ -246,6 +252,7 @@ object SimilarDocs:
       _ <- similarDocs.run()
     yield ()
 
+  /** Parses the command-line configuration file argument. */
   private def parseConfigFile(args: Array[String]): Try[File] =
     args.toSeq match
       case Seq(value) if value.startsWith("-confFile=") && value.length > "-confFile=".length =>
@@ -292,6 +299,7 @@ object SimilarDocs:
         DiceComparator(searchField, normalize = true, minSimilarity) +: comparators
       case _ => comparators
 
+  /** Indicates whether a Dice comparator covers the indexed field. */
   private def hasDiceComparatorFor(comparators: Seq[Comparator],
                                    fieldName: String): Boolean =
     comparators.exists:

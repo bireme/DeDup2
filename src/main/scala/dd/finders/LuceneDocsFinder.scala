@@ -67,6 +67,7 @@ class LuceneDocsFinder(luceneIndex: String,
          */
         def getDocuments: LazyList[Document] = lazyList(normalizedQuery, scoreDocs)
 
+  /** Builds the main Lucene query for a search request. */
   private def buildQuery(searchField: String,
                          query: String,
                          auxQuery: Option[String],
@@ -81,6 +82,7 @@ class LuceneDocsFinder(luceneIndex: String,
         builder.build()
       case None => tokenQuery
 
+  /** Builds a query from analyzed input tokens. */
   private def buildTokenQuery(searchField: String,
                               query: String): Query =
     val tokens: Seq[String] = analyzedTokens(searchField, query).take(maxQueryTokens)
@@ -94,6 +96,7 @@ class LuceneDocsFinder(luceneIndex: String,
 
       builder.build()
 
+  /** Returns analyzer tokens for the supplied query text. */
   private def analyzedTokens(searchField: String,
                              value: String): Seq[String] =
     val stream: TokenStream = analyzer.tokenStream(searchField, StringReader(value))
@@ -114,6 +117,7 @@ class LuceneDocsFinder(luceneIndex: String,
    */
   def getSearchField: Option[String] = Some(searchField)
 
+  /** Returns the configured Lucene similarity threshold. */
   def getMinSimilarity: Option[Double] = Some(minSimilarity)
 
   /**
@@ -148,6 +152,7 @@ class LuceneDocsFinder(luceneIndex: String,
         exception.printStackTrace()
         LazyList[Document]()
 
+  /** Determines whether a candidate score meets the configured threshold. */
   private def isSimilar(normalizedQuery: String,
                         candidate: String): Boolean =
     val normalizedCandidate = Tools.normalizeStr(Option(candidate).getOrElse(""))
