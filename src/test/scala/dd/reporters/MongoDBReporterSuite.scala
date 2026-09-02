@@ -26,7 +26,7 @@ class MongoDBReporterSuite extends munit.FunSuite:
     assertEquals(document.getDouble("similarity").doubleValue(), 0.75)
     assertEquals(document.getString("isSimilar"), "true")
 
-  test("resultFieldFor appends wildcard suffix when either compared field is empty"):
+  test("resultFieldFor keeps the configured field name when compared fields are empty"):
     val result = CompResult(
       "NGramComparator",
       "title",
@@ -40,7 +40,7 @@ class MongoDBReporterSuite extends munit.FunSuite:
 
     val (fieldName, document) = MongoDBReporter.resultFieldFor(result)
 
-    assertEquals(fieldName, "title_*")
+    assertEquals(fieldName, "title")
     assertEquals(document.getString("originalField"), "")
     assertEquals(document.getString("currentField"), "")
     assertEquals(document.getString("isSimilar"), "maybe")
@@ -49,7 +49,7 @@ class MongoDBReporterSuite extends munit.FunSuite:
       result.copy(originalField = "Original Title")
     )
 
-    assertEquals(fieldNameWithOnlyCurrentEmpty, "title_*")
+    assertEquals(fieldNameWithOnlyCurrentEmpty, "title")
 
   test("shouldWriteResults applies minTrue threshold"):
     val similarResult = CompResult("NGramComparator", "title", "a", "a", None, None, 1.0, isSimilar = true)

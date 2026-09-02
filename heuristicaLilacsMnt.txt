@@ -1,6 +1,6 @@
 
 Escreva um objeto (LilacsMntHeuristic) em heuristics que recebe como parametro o caminho de um arquivo de entrada com valores separados por pipe e um caminho de um arquivo texto de saida.
-Defina constantes para as posicoes dos campos id1Pos, id2Pos, titlePos, year1Pos, year2Pos, authorCompPos, volume1Pos, volume2Pos, issue1Pos, issue2Pos, page1Pos e page2Pos
+Defina constantes para as posicoes dos campos id1Pos, id2Pos, titleCompPos, year1Pos, year2Pos, authorCompPos, volume1Pos, volume2Pos, issue1Pos, issue2Pos, page1Pos e page2Pos
 Para cada linha nao vazia do arquivo faça:
     Cheque se o numero de campos é maior ou igual a 12
     Atribua às variáveis id1, id2, titleComp, year1, year2, authorComp, volume1, volume2, issue1, issue2,  page1 e page2 os conteudos dos campos
@@ -11,10 +11,7 @@ Para cada linha nao vazia do arquivo faça:
 Regras:
 
 1) Se titulos são idênticos (valor do campo titleComp = 1.0)
-    a) volumes, numeros(issues) e paginas sao iguais e diferentes de null
-    b) volume é null mas numeros, paginas, anos e autores (authorComp = 1.0) são iguais e diferentes de null
-    c) numero é null mas volumes, paginas, anos e autores (authorComp = 1.0) são iguais e diferentes de null
-    d) pagina é null mas volumes, numeros(issues) e autores (authorComp = 1.0) são iguais e diferentes de null
+    3 das seguintes pares de variaveis sao iguais e diferentes de null (volumes, issues, paginas, anos e autores (authorComp >= 0.8))
 
-2) Se titulos são parecidos (0.8 <= sim < 1.0)
-  A) volumes, numeros, paginas anos e autores são iguais e diferentes de null
+2) Se titulos são parecidos (0.8 <= titleComp < 1.0)
+  4 das seguintes pares de variaveis sao iguais e diferentes de null (volumes, issues, paginas, anos e autores (authorComp >= 0.8))

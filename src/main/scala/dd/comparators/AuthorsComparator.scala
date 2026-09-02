@@ -59,7 +59,7 @@ class AuthorsComparator(fieldName: String,
       if fromSeq.length < toSeq.length * 0.8 then
         buildResult(score = 0, isSimilar = false)
       else
-        val isSimilar = fromSeq.forall(existSimilar(_, toSeq))
+        val isSimilar: Boolean = fromSeq.forall(existSimilar(_, toSeq))
         buildResult(score = if isSimilar then 1 else 0, isSimilar = isSimilar)
 
   /**
@@ -102,9 +102,9 @@ class AuthorsComparator(fieldName: String,
    * @return normalized author value
    */
   private def normalizeAuthorName(author: String): String =
-    val trimmedName = author.replaceAll(" {2,}", " ").trim
-    val invertedName = trimmedName.split(" *, *", 2)
-    val orderedName = (if invertedName.length == 2 then invertedName.reverse else invertedName).mkString(" ")
+    val trimmedName: String = author.replaceAll(" {2,}", " ").trim
+    val invertedName: Array[String] = trimmedName.split(" *, *", 2)
+    val orderedName: String = (if invertedName.length == 2 then invertedName.reverse else invertedName).mkString(" ")
 
     Normalizer.normalize(orderedName.toLowerCase(), Form.NFD)
       .replaceAll("[\\p{InCombiningDiacriticalMarks}]", "")
@@ -130,9 +130,9 @@ class AuthorsComparator(fieldName: String,
    */
   private def isSimilar(author1: String,
                         author2: String): Boolean =
-    val similarity = getSimilarity(author1, author2)
-    val hasCompatibleInitial = author1.nonEmpty && author2.nonEmpty && author1.head == author2.head
-    val bothAreShortNames = author1.split(" ").length == 2 && author2.split(" ").length == 2
+    val similarity: Double = getSimilarity(author1, author2)
+    val hasCompatibleInitial: Boolean = author1.nonEmpty && author2.nonEmpty && author1.head == author2.head
+    val bothAreShortNames: Boolean = author1.split(" ").length == 2 && author2.split(" ").length == 2
 
     (author1.isEmpty && author2.isEmpty) ||
       (hasCompatibleInitial && bothAreShortNames && similarity >= shortNameSimilarityThreshold) ||
@@ -201,9 +201,9 @@ object AuthorsComparator:
   private def processLine(line: String): Unit =
     line.split("\\|", 2) match
       case Array(left, right) =>
-        val originalDoc = Document(Seq("authors" -> left))
-        val currentDoc = Document(Seq("authors" -> right))
-        val result = new AuthorsComparator("authors").compare(originalDoc, currentDoc)
+        val originalDoc: Document = Document(Seq("authors" -> left))
+        val currentDoc: Document = Document(Seq("authors" -> right))
+        val result: CompResult = new AuthorsComparator("authors").compare(originalDoc, currentDoc)
 
         Option.when(!result.isSimilar)(Seq(result.originalField, result.currentField, "")).foreach(_.foreach(println))
       case _ =>

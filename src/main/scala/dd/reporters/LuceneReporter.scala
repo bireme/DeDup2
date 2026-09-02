@@ -46,7 +46,7 @@ class LuceneReporter(index: String,
                             otherFields: Seq[String],
                             results: Seq[CompResult]): Try[Unit] =
     if LuceneReporter.shouldWriteResults(results, minTrue) then
-      val reportFields = LuceneReporter.reportFields(originalDoc, currentDoc, otherFields, results, fieldNameMapping)
+      val reportFields: Seq[(String, String)] = LuceneReporter.reportFields(originalDoc, currentDoc, otherFields, results, fieldNameMapping)
       addDocument(reportFields)
     else Success(())
 
@@ -55,11 +55,11 @@ class LuceneReporter(index: String,
    * @return result of closing the underlying resources
    */
   override def close(): Try[Unit] =
-    val closedWriter = Try:
+    val closedWriter: Try[Unit] = Try:
       writer.forceMerge(1)
       writer.close()
-    val closedAnalyzer = Try(analyzer.close())
-    val closedDirectory = Try(directory.close())
+    val closedAnalyzer: Try[Unit] = Try(analyzer.close())
+    val closedDirectory: Try[Unit] = Try(directory.close())
 
     Seq(closedWriter, closedAnalyzer, closedDirectory).collectFirst:
       case Failure(exception) => Failure(exception)
@@ -73,7 +73,7 @@ class LuceneReporter(index: String,
    */
   private def addDocument(fields: Seq[(String, String)]): Try[Unit] =
     Try:
-      val luceneDocument = fields.foldLeft(new document.Document()):
+      val luceneDocument: document.Document = fields.foldLeft(new document.Document()):
         case (doc, (name, value)) =>
           if name == fieldToIndex then doc.add(new TextField(name, value, Field.Store.YES))
           else doc.add(new StoredField(name, value))
@@ -110,7 +110,7 @@ private[reporters] object LuceneReporter:
                    otherFields: Seq[String],
                    results: Seq[CompResult],
                    fieldNameMapping: Map[String, String] = Map.empty): Seq[(String, String)] =
-    val baseFields = otherFields.flatMap:
+    val baseFields: Seq[(String, String)] = otherFields.flatMap:
       field =>
         Seq(
           s"${field.trim}_1" -> collectField(originalDoc, field),
