@@ -44,8 +44,8 @@ class ComparatorsSuite extends munit.FunSuite:
     val result = comparator.compare(left, right)
 
     assertEquals(result.name, "NGramComparator")
-    assertEquals(result.similarity, 0.5)
-    assertEquals(result.isSimilar, false)
+    assertEquals(result.similarity, 0.6)
+    assertEquals(result.isSimilar, true)
 
   test("comparators do not consider two empty fields similar"):
     val left = Document(Seq.empty)

@@ -21,7 +21,7 @@ class LuceneSimDocs(luceneIndex: String,
                     maxDocs: Option[Int],
                     otherFields: Seq[String],
                     minSimilarity: Double = 0.0):
-  private val delegate = new SimilarDocs(
+  private val delegate: SimilarDocs = new SimilarDocs(
     SimilarDocsConfig(
       producer = new DocsProducer:
         override def getDocuments: LazyList[Document] = LazyList.empty,

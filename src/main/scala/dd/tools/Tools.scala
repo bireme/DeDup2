@@ -34,14 +34,14 @@ object Tools:
     Try:
       args.foldLeft(Map.empty[String, String]):
         case (map, rawArgument) =>
-          val argument =
+          val argument: String =
             if rawArgument.length >= 2 &&
               ((rawArgument.head == '\'' && rawArgument.last == '\'') ||
                 (rawArgument.head == '"' && rawArgument.last == '"'))
             then rawArgument.substring(1, rawArgument.length - 1)
             else rawArgument
 
-          val split = argument.split(" *= *", 2)
+          val split: Array[String] = argument.split(" *= *", 2)
           if split.length == 1 then map + (split(0).substring(2) -> "")
           else map + (split(0).substring(1) -> split(1))
 
@@ -55,6 +55,19 @@ object Tools:
     .replaceAll("[^a-z0-9]", "")
 
   /**
+   * Normalizes text while preserving word boundaries for word-based comparisons.
+   *
+   * @param in input string to normalize
+   * @return lowercase ASCII text with single spaces between words
+   */
+  def normalizeWordsStr(in: String): String =
+    Normalizer.normalize(in.toLowerCase, Form.NFD)
+      .replaceAll("\\p{M}", "")
+      .replaceAll("[^a-z0-9\\s]", " ")
+      .replaceAll("\\s+", " ")
+      .trim
+
+  /**
    * Parses a comma-separated SQL file list.
    *
    * @param sqlfs raw sqlfs parameter value
@@ -62,7 +75,7 @@ object Tools:
    */
   def parseSqlFileList(sqlfs: String): Try[Seq[String]] =
     Try:
-      val files = sqlfs.replace("\\,", ",").split(" *, *").toSeq.map(_.trim).filter(_.nonEmpty)
+      val files: Seq[String] = sqlfs.replace("\\,", ",").split(" *, *").toSeq.map(_.trim).filter(_.nonEmpty)
       if files.isEmpty then throw IllegalArgumentException("Parameter sqlfs must contain at least one SQL file.")
       files
 
@@ -83,7 +96,7 @@ object Tools:
     Try:
       val iPath: Path = new File(indexPath).toPath
       val directory: Directory = FSDirectory.open(iPath)
-      val openMode =
+      val openMode: IndexWriterConfig.OpenMode =
         if append then IndexWriterConfig.OpenMode.CREATE_OR_APPEND
         else IndexWriterConfig.OpenMode.CREATE
       val config: IndexWriterConfig = new IndexWriterConfig(analyzer).setOpenMode(openMode)

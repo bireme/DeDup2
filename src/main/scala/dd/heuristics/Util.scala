@@ -30,7 +30,7 @@ object Util:
    * @return {@code false} for an empty value or the marker {@code null}
    */
   def present(value: String): Boolean =
-    val normalized = value.trim
+    val normalized: String = value.trim
     normalized.nonEmpty && !normalized.equalsIgnoreCase("null")
 
   /**

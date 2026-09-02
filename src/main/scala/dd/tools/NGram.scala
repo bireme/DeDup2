@@ -33,9 +33,9 @@ object NGram:
     else if left == right then
       1d
     else
-      val leftTokens = tokenize(left, n)
-      val rightTokens = tokenize(right, n)
-      val distance = leftTokens.intersect(rightTokens).length
+      val leftTokens: List[List[T]] = tokenize(left, n)
+      val rightTokens: List[List[T]] = tokenize(right, n)
+      val distance: Int = leftTokens.intersect(rightTokens).length
       distance.toDouble / math.max(leftTokens.length, rightTokens.length)
 
   @annotation.tailrec

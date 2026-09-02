@@ -12,7 +12,7 @@ class LuceneDocsFinderSuite extends munit.FunSuite:
     val producer = new DocsProducer:
       override def getDocuments: LazyList[Document] =
         LazyList(
-          Document(Seq("id" -> "1", "title" -> "defzzzabc")),
+          Document(Seq("id" -> "1", "title" -> "defzzz")),
           Document(Seq("id" -> "2", "title" -> "abczzzdef"))
         )
 

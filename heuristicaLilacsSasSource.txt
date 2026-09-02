@@ -1,22 +1,17 @@
 
-Escreva um objeto (LilacsSasSurce) em heuristics que recebe como parametro o caminho de um arquivo de entrada com valores separados por pipe e um caminho de um arquivo texto de saida.
-Defina constantes para as posicoes dos campos id1Pos, id2Pos, titleSerialPos, issn1Pos, issn2Pos, volume1Pos, volume2Pos, issue1Pos, issue2Pos, year1Pos, year2Pos
+Escreva um objeto (LilacsSasSourceHeuristic) em heuristics que recebe como parametro o caminho de um arquivo de entrada com valores separados por pipe e um caminho de um arquivo texto de saida.
+Defina constantes para as posicoes dos campos id1Pos, id2Pos, titleSerialCompPos, issn1Pos, issn2Pos, volume1Pos, volume2Pos, issue1Pos, issue2Pos, year1Pos, year2Pos
 Para cada linha nao vazia do arquivo faça:
     Cheque se o numero de campos é diferente de 11
-    Atribua às variáveis id1, id2, titleSerialComp, isn1, issn2 , volume1, volume2, issue1, issue2, year1, year2 os conteudos dos campos
+    Atribua às variáveis id1, id2, titleSerialComp, isn1, issn2, volume1, volume2, issue1, issue2, year1, year2 os conteudos dos campos
     A linhas será considerada 'duplicadas' se uma das regras abaixo for verdadeira e 'diferentes' caso contrario
     Escreva no arquivo de saída uma linha com o formato:  <id1>|<id2>|<status>   onde <status> é 'duplicadas' ou 'diferentes'
 
 
 Regras:
 
-1) Se titulos da série são idênticos (valor do campo titleSerialComp = 1.0)
-  A) issn são iguais e diferentes de null
+1) Se titulos são idênticos (valor do campo titleSerialComp = 1.0)
+    3 das seguintes pares de variaveis sao iguais e diferentes de null (issns, volumes, issues, anos)
 
-  B)
-    a) volumes, numeros(issues) e anos sao iguais e diferentes de null
-    b) volume é null mas numeros, paginas, anos são iguais e diferentes de null
-    c) numero é null mas volumes, paginas, anos são iguais e diferentes de null
-
-2) Se titulos são parecidos (0.8 <= sim < 1.0)
-  A) revistas, volumes, numeros, paginas são pelo menos 3 deles diferentes de null e estes são iguais entre si
+2) Se titulos são parecidos (0.8 <= titleSerialComp < 1.0)
+  os seguintes pares de variaveis sao iguais e diferentes de null: issns, volumes, issues, anos

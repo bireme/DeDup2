@@ -29,7 +29,7 @@ class ExactComparator(fieldName: String,
     val cString: String = cFields.map(_.trim).mkString(fieldSeparator)
     val oString2: String = if normalize then Tools.normalizeStr(oString) else oString
     val cString2: String = if normalize then Tools.normalizeStr(cString) else cString
-    val bothEmpty = oString2.isEmpty && cString2.isEmpty
+    val bothEmpty: Boolean = oString2.isEmpty && cString2.isEmpty
     val similar: Boolean = !bothEmpty && oString2.equals(cString2)
 
     CompResult("ExactComparator", fieldName, oString, cString, Some(oString2), Some(cString2),

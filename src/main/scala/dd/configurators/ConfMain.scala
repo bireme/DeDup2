@@ -1,6 +1,6 @@
 package dd.configurators
 
-import dd.comparators.{AuthorsComparator, DiceComparator, ExactComparator, NGramComparator, RegexComparator}
+import dd.comparators.{AuthorsComparator, DiceComparator, ExactComparator, JaccardComparator, LevenshteinComparator, LevenshteinJaccardComparator, NGramComparator, RegexComparator}
 import dd.finders.LuceneDocsFinder
 import dd.heuristics.{DirevHeuristic, LilacsMntHeuristic, LilacsMntamHeuristic, LilacsSasHeuristic, LilacsSasSourceHeuristic, LisHeuristic}
 import dd.interfaces.{Comparator, DocsFinder, DocsProducer, Heuristics, Reporter}
@@ -553,6 +553,9 @@ object ConfMain:
                               jsonStr: String): Comparator =
     if map.contains("exact") then parseExactComparator(map("exact").as[JsObject])
     else if map.contains("dice") then parseDiceComparator(map("dice").as[JsObject])
+    else if map.contains("levenshtein") then parseLevenshteinComparator(map("levenshtein").as[JsObject])
+    else if map.contains("jaccard") then parseJaccardComparator(map("jaccard").as[JsObject])
+    else if map.contains("levenshteinJaccard") then parseLevenshteinJaccardComparator(map("levenshteinJaccard").as[JsObject])
     else if map.contains("ngram") then parseNGramComparator(map("ngram").as[JsObject])
     else if map.contains("regex") then parseRegexComparator(map("regex").as[JsObject])
     else if map.contains("authors") then parseAuthorsComparator(map("authors").as[JsObject])
@@ -603,6 +606,24 @@ object ConfMain:
   private def parseDiceComparator(json: JsObject): DiceComparator =
     val map: collection.Map[String, JsValue] = json.value
     new DiceComparator(requiredString(map, "fieldName"), requiredBoolean(map, "normalize"),
+      requiredDouble(map, "minSimilarity"))
+
+  /** Parses the Levenshtein comparator configuration. */
+  private def parseLevenshteinComparator(json: JsObject): LevenshteinComparator =
+    val map: collection.Map[String, JsValue] = json.value
+    new LevenshteinComparator(requiredString(map, "fieldName"), requiredBoolean(map, "normalize"),
+      requiredDouble(map, "minSimilarity"))
+
+  /** Parses the word-based Jaccard comparator configuration. */
+  private def parseJaccardComparator(json: JsObject): JaccardComparator =
+    val map: collection.Map[String, JsValue] = json.value
+    new JaccardComparator(requiredString(map, "fieldName"), requiredBoolean(map, "normalize"),
+      requiredDouble(map, "minSimilarity"))
+
+  /** Parses the combined Levenshtein-Jaccard comparator configuration. */
+  private def parseLevenshteinJaccardComparator(json: JsObject): LevenshteinJaccardComparator =
+    val map: collection.Map[String, JsValue] = json.value
+    new LevenshteinJaccardComparator(requiredString(map, "fieldName"), requiredBoolean(map, "normalize"),
       requiredDouble(map, "minSimilarity"))
 
   /**

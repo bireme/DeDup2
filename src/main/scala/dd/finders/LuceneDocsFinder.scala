@@ -5,6 +5,7 @@ import dd.interfaces.{DocsFinder, DocsProducer, Document}
 import dd.tools.StringSimilarity.DiceCoefficient
 import dd.tools.Tools
 import org.apache.lucene.document
+import org.apache.lucene.analysis.TokenStream
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute
 import org.apache.lucene.index.DirectoryReader
 import org.apache.lucene.index.Term
@@ -70,11 +71,11 @@ class LuceneDocsFinder(luceneIndex: String,
                          query: String,
                          auxQuery: Option[String],
                          parser: QueryParser): Query =
-    val tokenQuery = buildTokenQuery(searchField, query)
+    val tokenQuery: Query = buildTokenQuery(searchField, query)
 
     auxQuery match
       case Some(aqry) =>
-        val builder = new BooleanQuery.Builder()
+        val builder: BooleanQuery.Builder = new BooleanQuery.Builder()
         builder.add(tokenQuery, BooleanClause.Occur.MUST)
         builder.add(parser.parse(aqry), BooleanClause.Occur.FILTER)
         builder.build()
@@ -82,10 +83,10 @@ class LuceneDocsFinder(luceneIndex: String,
 
   private def buildTokenQuery(searchField: String,
                               query: String): Query =
-    val tokens = analyzedTokens(searchField, query).take(maxQueryTokens)
+    val tokens: Seq[String] = analyzedTokens(searchField, query).take(maxQueryTokens)
     if tokens.isEmpty then MatchNoDocsQuery("empty token query")
     else
-      val builder = new BooleanQuery.Builder()
+      val builder: BooleanQuery.Builder = new BooleanQuery.Builder()
       builder.setMinimumNumberShouldMatch(1)
 
       tokens.foreach: token =>
@@ -95,9 +96,9 @@ class LuceneDocsFinder(luceneIndex: String,
 
   private def analyzedTokens(searchField: String,
                              value: String): Seq[String] =
-    val stream = analyzer.tokenStream(searchField, StringReader(value))
-    val termAttr = stream.addAttribute(classOf[CharTermAttribute])
-    val tokens = ListBuffer.empty[String]
+    val stream: TokenStream = analyzer.tokenStream(searchField, StringReader(value))
+    val termAttr: CharTermAttribute = stream.addAttribute(classOf[CharTermAttribute])
+    val tokens: ListBuffer[String] = ListBuffer.empty[String]
 
     try
       stream.reset()

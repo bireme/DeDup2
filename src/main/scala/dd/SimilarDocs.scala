@@ -48,7 +48,7 @@ class SimilarDocs private[dd] (config: SimilarDocsConfig):
   private val auxQuery: Option[String] = config.auxQuery
   private val maxDocs: Option[Int] = config.maxDocs
   private val documentParallelism: Int = config.documentParallelism
-  private val reporterLock = new Object
+  private val reporterLock: Object = new Object
 
   /**
    * Runs the complete similarity workflow for the configured source producer.

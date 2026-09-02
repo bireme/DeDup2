@@ -1,6 +1,6 @@
 
 Escreva um objeto (DirevHeuristic) em heuristics que recebe como parametro o caminho de um arquivo de entrada com valores separados por pipe e um caminho de um arquivo texto de saida.
-Defina constantes para as posicoes dos campos id1Pos, id2Pos, titlePos, date1Pos, date2Pos, url1Pos, url22Pos
+Defina constantes para as posicoes dos campos id1Pos, id2Pos, titleCompPos, date1Pos, date2Pos, url1Pos, url22Pos
 Para cada linha nao vazia do arquivo faça:
     Cheque se o numero de campos é diferente de 7
     Atribua às variáveis id1, id2, titleComp, date1, date2, url1, url2 os conteudos dos campos

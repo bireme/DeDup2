@@ -21,8 +21,8 @@ class NormalizeCharFilter(input: TokenStream) extends TokenFilter(input):
    */
   override def incrementToken(): Boolean =
     if input.incrementToken() then
-      val original = termAttr.toString
-      val normalized = normalizeText(original)
+      val original: String = termAttr.toString
+      val normalized: String = normalizeText(original)
 
       termAttr.setEmpty().append(normalized)
       true
@@ -35,7 +35,7 @@ class NormalizeCharFilter(input: TokenStream) extends TokenFilter(input):
    * @return normalized token text
    */
   private def normalizeText(text: String): String =
-    val noAccents = Normalizer.normalize(text, Normalizer.Form.NFD)
+    val noAccents: String = Normalizer.normalize(text, Normalizer.Form.NFD)
       .replaceAll("\\p{M}", "") // Remove marcas diacríticas (acentos)
 
     noAccents
