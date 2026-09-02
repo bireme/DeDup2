@@ -95,6 +95,7 @@ class CSVProducer(csv: String,
    * @return next successfully converted document when available
    */
   @tailrec
+  /** Reads and converts the next CSV record into an internal document. */
   private def nextDocument(schema: Map[Int, String],
                            iterator: Iterator[CSVRecord]): Option[Document] =
     if !iterator.hasNext then None

@@ -63,6 +63,7 @@ class JsonProducer(input: String,
    * @return next successfully converted document when available
    */
   @tailrec
+  /** Reads and converts the next JSON object from the input iterator. */
   private def nextDocument(iterator: Iterator[JsValue]): Option[Document] =
     if !iterator.hasNext then None
     else

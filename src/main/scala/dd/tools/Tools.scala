@@ -106,6 +106,7 @@ object Tools:
         case (dc, idx) =>
           if idx % 100_000 == 0 then println(s"+++$idx")
 
+          /** Reads one field value from the current Lucene document. */
           def documentFieldValue(fieldName: String): String =
             dc.fields.collectFirst:
               case (name, value) if name == fieldName => value

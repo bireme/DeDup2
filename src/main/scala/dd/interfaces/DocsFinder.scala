@@ -30,6 +30,7 @@ trait DocsFinder:
    */
   def getSearchField: Option[String]
   
+  /** Returns the configured minimum similarity threshold, when available. */
   def getMinSimilarity: Option[Double]
 
   /**

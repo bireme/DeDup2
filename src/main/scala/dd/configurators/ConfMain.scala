@@ -496,6 +496,7 @@ object ConfMain:
       parseLuceneMinSimilarity(lucene)
     )
 
+  /** Reads and validates the Lucene minimum similarity setting. */
   private def parseLuceneMinSimilarity(lucene: JsLookupResult): Double =
     val value: Double = (lucene \ "minSimilarity").asOpt[Double]
       .getOrElse(throw new IllegalArgumentException("Missing 'finder/lucene/minSimilarity'"))
@@ -503,6 +504,7 @@ object ConfMain:
       throw new IllegalArgumentException("'finder/lucene/minSimilarity' must be between 0.0 and 1.0")
     value
 
+  /** Reads the configured document worker parallelism. */
   private def parseDocumentParallelism(json: JsValue): Int =
     val default = Runtime.getRuntime.availableProcessors().max(1)
     val value = (json \ "documentParallelism").asOpt[Int]
@@ -688,6 +690,7 @@ object ConfMain:
     val flushResults: Boolean = map.get("flushResults").flatMap(_.asOpt[Boolean]).getOrElse(false)
     new JsonReporter(writer, minTrue, flushResults)
 
+  /** Resolves and creates the parent directory for an output file. */
   private def prepareOutputFile(fileName: String): java.nio.file.Path =
     val path = new File(fileName).toPath
     Option(path.getParent).foreach(parent => Files.createDirectories(parent))
@@ -941,6 +944,7 @@ object ConfMain:
             case None => map
     .get
 
+  /** Parses one JSON field-mapping line from a configuration file. */
   private def parseJsonFieldMappingLine(fileName: String,
                                         line: String,
                                         lineNumber: Int): Option[(String, String, String)] =

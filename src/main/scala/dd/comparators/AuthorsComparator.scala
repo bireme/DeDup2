@@ -84,6 +84,7 @@ class AuthorsComparator(fieldName: String,
 
     (rawAuthors, normalizedAuthors)
 
+  /** Extracts normalized author names from a document field. */
   private def getAuthors(field: String,
                          authorSeparator: String): Seq[String] =
     if field.isEmpty then Seq[String]()
@@ -91,6 +92,7 @@ class AuthorsComparator(fieldName: String,
     else if field.contains(";") then separateBySemicolon(field)
     else Seq(field.trim)
 
+  /** Splits an author field into non-empty semicolon-separated values. */
   private def separateBySemicolon(field: String): Seq[String] =
     CSVFormat.Builder.create().setDelimiter(';').setTrim(true).get().
       parse(new StringReader(field)).asScala.head.asScala.toSeq.map(_.trim)

@@ -110,6 +110,7 @@ class JsonReporter(writer: Writer,
         writer.write("]")
       closed = true
 
+  /** Flushes the writer when immediate output was requested. */
   private def flushIfRequested(): Unit =
     if flushResults then writer.flush()
 
@@ -142,6 +143,7 @@ class JsonReporter(writer: Writer,
   private def getOtherFields(originalDoc: Document,
                              currentDoc: Document,
                              otherFields: Seq[String]): Seq[(String, JsValue)] =
+    /** Collects all occurrences of a document field as JSON. */
     def collectField(doc: Document, oField: String): JsValue =
       nullIfEmpty(doc.fields.filter(_._1.equals(oField)).map(_._2).mkString("|"))
 
@@ -170,6 +172,7 @@ class JsonReporter(writer: Writer,
       "isSimilar" -> similarityValue(result)
     )
 
+  /** Converts a comparison result similarity to JSON. */
   private def similarityValue(result: CompResult): JsValue =
     JsString(ReporterSimilarityStatus.displayValue(result))
 

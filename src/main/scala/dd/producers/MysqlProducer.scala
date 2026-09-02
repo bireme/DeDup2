@@ -39,6 +39,7 @@ case class MySqlProducerConfig(mySqlHost: String,
   require(sqlEncoding.trim.nonEmpty)
   require(repetitiveFields.isEmpty || repetitiveSep.isDefined)
 
+  /** Returns the configured SQL file list in command-line form. */
   def sqlf: String = sqlfs.mkString(",")
 
 /**
@@ -197,6 +198,7 @@ class MysqlProducer(conf: MySqlProducerConfig) extends DocsProducer:
     case "iso8859-1" => scala.io.Codec.ISO8859
     case _           => scala.io.Codec.UTF8
   private val codAction: CodingErrorAction = CodingErrorAction.REPLACE
+  /** Creates a decoder configured to replace malformed input. */
   private def decoder: CharsetDecoder = codec.decoder.onMalformedInput(codAction)
 
   /**

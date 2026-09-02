@@ -250,12 +250,14 @@ object SQL2CSV:
             case many => Json.stringify(JsArray(many))
         key -> value
 
+  /** Converts a string value to a JSON value suitable for CSV export. */
   private def csvFieldValue(value: String): JsValue =
     val trimmed = Option(value).getOrElse("").trim
     if trimmed.startsWith("[") || trimmed.startsWith("{") then
       Try(Json.parse(trimmed)).getOrElse(JsString(trimmed))
     else JsString(trimmed)
 
+  /** Converts a JSON value to its CSV text representation. */
   private def stringifyCsvFieldValue(value: JsValue): String =
     value match
       case JsString(text) => text
