@@ -1,6 +1,6 @@
 package dd.reporters
 
-import dd.interfaces.{CompResult, Document, Reporter}
+import dd.interfaces.{CompResult, Document, Reporter, SimilarityStatus}
 import play.api.libs.json.{JsArray, JsNull, JsNumber, JsObject, JsString, JsValue, Json}
 
 import java.io.Writer
@@ -18,10 +18,13 @@ import scala.util.Try
  *                required for a document pair to be written
  * @param flushResults true when the writer should be flushed after each
  *                     emitted document pair
+ * @param prettyPrint true when each emitted JSON object should be formatted
+ *                    with indentation and line breaks
  */
 class JsonReporter(writer: Writer,
                    minTrue: Int,
-                   flushResults: Boolean = false) extends Reporter:
+                   flushResults: Boolean = false,
+                   prettyPrint: Boolean = false) extends Reporter:
   private val RecordSeparator: String = "\n"
   private var arrayStarted: Boolean = false
   private var rowWritten: Boolean = false
@@ -79,13 +82,15 @@ class JsonReporter(writer: Writer,
                                  currentDoc: Document,
                                  otherFields: Seq[String],
                                  results: Seq[CompResult]): Try[Unit] = {
-    // if results.count(_.isSimilar) >= minTrue then println(s"isSimilar count=${results.count(_.isSimilar)} min=$minTrue")
-    if results.count(_.isSimilar) < minTrue then Try(())
+    // if results.count(_.isSimilar == SimilarityStatus.yes) >= minTrue then println(s"isSimilar count=${results.count(_.isSimilar == SimilarityStatus.yes)} min=$minTrue")
+    if results.count(_.isSimilar == SimilarityStatus.yes) < minTrue then Try(())
     else
       Try:
         ensureArrayStarted()
         if rowWritten then writer.write(s",$RecordSeparator")
-        writer.write(Json.stringify(serializeRow(originalDoc, currentDoc, otherFields, results)))
+        val serialized: JsObject = serializeRow(originalDoc, currentDoc, otherFields, results)
+        val json: String = if prettyPrint then Json.prettyPrint(serialized) else Json.stringify(serialized)
+        writer.write(json)
         rowWritten = true
         flushIfRequested()
   }
@@ -143,7 +148,13 @@ class JsonReporter(writer: Writer,
   private def getOtherFields(originalDoc: Document,
                              currentDoc: Document,
                              otherFields: Seq[String]): Seq[(String, JsValue)] =
-    /** Collects all occurrences of a document field as JSON. */
+    /**
+     * Collects all occurrences of a document field as JSON.
+     *
+     * @param doc document whose field is read
+     * @param oField field name to collect
+     * @return JSON value containing the field occurrences
+     */
     def collectField(doc: Document, oField: String): JsValue =
       nullIfEmpty(doc.fields.filter(_._1.equals(oField)).map(_._2).mkString("|"))
 
@@ -172,7 +183,12 @@ class JsonReporter(writer: Writer,
       "isSimilar" -> similarityValue(result)
     )
 
-  /** Converts a comparison result similarity to JSON. */
+  /**
+   * Converts a comparison result similarity to JSON.
+   *
+   * @param result comparison result to convert
+   * @return JSON similarity status
+   */
   private def similarityValue(result: CompResult): JsValue =
     JsString(ReporterSimilarityStatus.displayValue(result))
 

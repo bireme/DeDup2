@@ -1,6 +1,6 @@
 package dd.comparators
 
-import dd.interfaces.{CompResult, Comparator, Document}
+import dd.interfaces.{CompResult, Comparator, Document, SimilarityStatus}
 import dd.tools.Tools
 
 /**
@@ -29,8 +29,15 @@ class ExactComparator(fieldName: String,
     val cString: String = cFields.map(_.trim).mkString(fieldSeparator)
     val oString2: String = if normalize then Tools.normalizeStr(oString) else oString
     val cString2: String = if normalize then Tools.normalizeStr(cString) else cString
-    val bothEmpty: Boolean = oString2.isEmpty && cString2.isEmpty
-    val similar: Boolean = !bothEmpty && oString2.equals(cString2)
+    val originalEmpty: Boolean = oString2.isEmpty
+    val currentEmpty: Boolean = cString2.isEmpty
+    val similar: Boolean = oString2.equals(cString2)
+    val status: SimilarityStatus =
+      if originalEmpty && currentEmpty then SimilarityStatus.yes
+      else if originalEmpty != currentEmpty then SimilarityStatus.undefined
+      else if similar then SimilarityStatus.yes
+      else SimilarityStatus.no
+    val score: Int = if status == SimilarityStatus.yes then 1 else 0
 
     CompResult("ExactComparator", fieldName, oString, cString, Some(oString2), Some(cString2),
-        if similar then 1 else 0, similar)
+        score, status)

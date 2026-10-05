@@ -252,7 +252,12 @@ object SimilarDocs:
       _ <- similarDocs.run()
     yield ()
 
-  /** Parses the command-line configuration file argument. */
+  /**
+   * Parses the command-line configuration file argument.
+   *
+   * @param args command-line arguments
+   * @return parsed configuration file
+   */
   private def parseConfigFile(args: Array[String]): Try[File] =
     args.toSeq match
       case Seq(value) if value.startsWith("-confFile=") && value.length > "-confFile=".length =>

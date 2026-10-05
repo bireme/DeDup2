@@ -2,14 +2,14 @@ name := "DeDup2"
 
 version := "0.1"
 
-scalaVersion := "3.8.4"
+scalaVersion := "3.10.0"
 
 val luceneVersion = "10.5.1"
 val commonsCVSVersion = "1.14.1"
 val playJsonVersion = "3.1.0-M10"
 val mysqlConnectorJVersion = "26.7.0"
 val mongoVersion = "5.11.0"
-val munitVersion = "1.3.5"
+val munitVersion = "1.3.6"
 val oxVersion = "1.0.6"
 val jettyVersion = "12.1.12"
 

@@ -4,7 +4,7 @@ import dd.interfaces.{CompResult, Document, Heuristics}
 import dd.heuristics.Util.*
 
 /**
- * Applies the Marcelo duplicate-detection rules to comparator results.
+ * Applies the LILACS/Sas duplicate-detection rules to comparator results.
  *
  * <p>This class is the pipeline-oriented LILACS/Sas field heuristic.
  * Instead of receiving a pipe-separated array, it receives the current
@@ -18,13 +18,13 @@ import dd.heuristics.Util.*
  * presence rules as the command-line object. A missing comparison result is
  * treated as a non-matching value.</p>
  */
-class LilacsSasHeuristic extends Heuristics:
-  private val titleField: String = "title"
-  private val journalField: String = "title_serial"
-  private val volumeField: String = "volume_serial"
-  private val issueField: String = "issue_number"
-  private val pageField: String = "pages"
-  private val yearField: String = "publication_year"
+class MarceloHeuristic extends Heuristics:
+  private val titleField: String = "titulo_artigo"
+  private val journalField: String = "titulo_revista"
+  private val yearField: String = "ano_publicacao"
+  private val volumeField: String = "volume_fasciculo"
+  private val issueField: String = "numero_fasciculo"
+  private val pageField: String = "pagina_inicial"
 
   /**
    * Determines whether the document pair satisfies a LILACS/Sas rule.
@@ -38,17 +38,18 @@ class LilacsSasHeuristic extends Heuristics:
   override def isDuplicated(doc: Document, results: Seq[CompResult]): Boolean =
     if doc == null then false
     else
+      //val id: String = doc.fields.find(tuple => tuple._1 == "id").map(_._2).getOrElse("0")
       val titleComp: Double = similarity(results, titleField)
       val volume: (String, String) = values(results, volumeField)
       val issue: (String, String) = values(results, issueField)
-      val page: (String, String) = values(results, pageField)
       val year: (String, String) = values(results, yearField)
+      val pages: (String, String) = values(results, pageField)
 
       if titleComp == 1.0 then
         if journalSimilarity(results) == 1.0 then
-          matchingFields(volume, issue, year, page) >= 3
+          matchingFields(volume, issue, year, pages) >= 3
         else if journalSimilarity(results) >= 0.8 && journalSimilarity(results) < 1.0 then
-          matchingFields(volume, issue, year, page) == 4
+          matchingFields(volume, issue, year, pages) >= 4
         else false
       else if titleComp >= 0.8 then
         Seq(
@@ -56,8 +57,8 @@ class LilacsSasHeuristic extends Heuristics:
           equalAndPresent(volume._1, volume._2),
           equalAndPresent(issue._1, issue._2),
           equalAndPresent(year._1, year._2),
-          equalAndPresent(page._1, page._2)
-        ).count(identity) == 5
+          equalAndPresent(pages._1, pages._2),
+        ).count(identity) >= 5
       else false
 
   /**
@@ -67,6 +68,7 @@ class LilacsSasHeuristic extends Heuristics:
    * @param issue compared issue values
    * @param year compared year values
    * @param pages compared page values
+   * @param authorSimilarity author comparison score
    * @return number of satisfied field conditions
    */
   private def matchingFields(volume: (String, String),
@@ -86,8 +88,9 @@ class LilacsSasHeuristic extends Heuristics:
    * @param results comparison results to search
    * @return journal similarity, or {@code 0.0} when absent
    */
-  private def journalSimilarity(results: Seq[CompResult]): Double =
+  private def journalSimilarity(results: Seq[CompResult]): Double = {
     similarity(results, journalField)
+  }
 
   /**
    * Finds the comparison result for a configured field and returns its score.
@@ -96,16 +99,8 @@ class LilacsSasHeuristic extends Heuristics:
    * @param fieldName comparator field name
    * @return the similarity score, or {@code 0.0} when no result exists
    */
-  private def similarity(results: Seq[CompResult], fieldName: String): Double = {
-    val x1: Option[CompResult] = results.find{
-      xx =>
-        val fName = xx.fieldName
-        val eq: Boolean = xx.fieldName == fieldName
-        eq
-    }
-    val x2: Option[Double] = x1.map(_.similarity)
+  private def similarity(results: Seq[CompResult], fieldName: String): Double =
     results.find(_.fieldName == fieldName).map(_.similarity).getOrElse(0.0)
-  }
 
   /**
    * Finds both compared values for a configured field.

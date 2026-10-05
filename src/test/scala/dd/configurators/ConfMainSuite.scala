@@ -2,7 +2,8 @@ package dd.configurators
 
 import dd.NGAnalyzer
 import dd.configurators.ConfMain.{SelfCheckCsvSourceConfig, SelfCheckMysqlSourceConfig}
-import dd.interfaces.{CompResult, DocsProducer, Document}
+import dd.heuristics.MarceloHeuristic
+import dd.interfaces.{CompResult, DocsProducer, Document, SimilarityStatus}
 import dd.tools.Tools
 import org.apache.lucene.index.DirectoryReader
 import org.apache.lucene.store.FSDirectory
@@ -48,7 +49,7 @@ class ConfMainSuite extends munit.FunSuite:
     assertEquals(parsed._3.size, 1)
     assertEquals(parsed._1.getSearchField, Some("title"))
 
-    val result = CompResult("ExactComparator", "title", "sample", "sample", None, None, 1.0, isSimilar = true)
+    val result = CompResult("ExactComparator", "title", "sample", "sample", None, None, 1.0, isSimilar = SimilarityStatus.yes)
     parsed._3.head.writeResults(
       Document(Seq("id" -> "1", "title" -> "sample")),
       Document(Seq("id" -> "2", "title" -> "sample")),
@@ -104,6 +105,32 @@ class ConfMainSuite extends munit.FunSuite:
     parsed._1.close().get
     parsed._3.foreach(_.close().get)
 
+  test("parseSimilarityConfig accepts URLs comparator"):
+    val config =
+      """{
+        |  "finder": {
+        |    "lucene": {
+        |      "searchField": "title",
+        |      "minSimilarity": 0.8
+        |    }
+        |  },
+        |  "comparators": [
+        |    { "urls": { "fieldName": "link", "occSeparator": ";;" } }
+        |  ]
+        |}""".stripMargin
+
+    val (_, comparators) = ConfMain.parseSimilarityConfig(config)
+    val result = comparators.head.compare(
+      Document(Seq("link" -> "http://example.org/article?id=999;;http://example.org/article?id=123")),
+      Document(Seq("link" -> "http://example.org/article?id=123"))
+    )
+
+    assertEquals(comparators.size, 1)
+    assertEquals(result.name, "UrlsComparator")
+    assertEquals(result.fieldName, "link")
+    assertEquals(result.isSimilar, SimilarityStatus.yes)
+    assertEquals(result.similarity, 1.0)
+
   test("parseSimilarDocsConfig reads document parallelism"):
     val indexDir = Files.createTempDirectory("dedup2-confmain-parallel-index")
     val reportFile = Files.createTempFile("dedup2-confmain-parallel-report", ".csv")
@@ -122,6 +149,7 @@ class ConfMainSuite extends munit.FunSuite:
     val config =
       s"""{
          |  "documentParallelism": 3,
+         |  "heuristic": "MarceloHeuristic",
          |  "producer": {
          |    "csv": {
          |      "file": "${escape(csvFile.toString)}",
@@ -149,6 +177,7 @@ class ConfMainSuite extends munit.FunSuite:
     val parsed = ConfMain.parseSimilarDocsConfig(configFile.toFile).get
 
     assertEquals(parsed.documentParallelism, 3)
+    assert(parsed.heuristic.exists(_.isInstanceOf[MarceloHeuristic]))
     parsed.finder.close().get
     parsed.reporters.foreach(_.reporter.close().get)
 
@@ -193,7 +222,7 @@ class ConfMainSuite extends munit.FunSuite:
     Files.writeString(configFile, config, StandardCharsets.UTF_8)
 
     val parsed = ConfMain.parseConfig(configFile.toFile).get
-    val result = CompResult("ExactComparator", "title", "sample", "sample", None, None, 1.0, isSimilar = true)
+    val result = CompResult("ExactComparator", "title", "sample", "sample", None, None, 1.0, isSimilar = SimilarityStatus.yes)
 
     parsed._3.head.writeResults(
       Document(Seq("id" -> "1", "title" -> "sample")),

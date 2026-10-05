@@ -23,7 +23,7 @@ import scala.util.{Failure, Success, Try}
  * @param projection optional JSON projection document
  * @param host optional MongoDB host, defaulting to localhost
  * @param port optional MongoDB port, defaulting to 27017
- * @param user optional MongoDB user name
+ * @param user optional MongoDB username
  * @param password optional MongoDB password
  * @param fields optional output field mappings in `outputField=mongo.path` format
  * @param noCursorTimeout whether to disable server-side cursor timeout

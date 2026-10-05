@@ -5,7 +5,13 @@ import dd.heuristics.Util.*
 
 /** Applies the LILACS/MNT duplicate-detection rules to MongoDB documents. */
 class LilacsMntHeuristic extends Heuristics:
-  /** Classifies a document pair using its comparator results. */
+  /**
+   * Classifies a document pair using its comparator results.
+   *
+   * @param doc document associated with the comparison pair
+   * @param results comparator results for the pair
+   * @return true when the pair is duplicated
+   */
   override def isDuplicated(doc: Document, results: Seq[CompResult]): Boolean =
     if doc == null then false
     else
@@ -30,10 +36,22 @@ class LilacsMntHeuristic extends Heuristics:
         matchingFields >= 4
       else false
 
-  /** Returns a comparator similarity score or zero when absent. */
+  /**
+   * Returns a comparator similarity score or zero when absent.
+   *
+   * @param results comparison results to search
+   * @param fieldName comparator field name
+   * @return similarity score, or zero when absent
+   */
   private def score(results: Seq[CompResult], fieldName: String): Double =
     results.find(_.fieldName == fieldName).map(_.similarity).getOrElse(0.0)
 
-  /** Returns the original and current values for a comparator field. */
+  /**
+   * Returns the original and current values for a comparator field.
+   *
+   * @param results comparison results to search
+   * @param fieldName comparator field name
+   * @return original and current values
+   */
   private def pair(results: Seq[CompResult], fieldName: String): (String, String) =
     results.find(_.fieldName == fieldName).map(result => (result.originalField, result.currentField)).getOrElse(("", ""))

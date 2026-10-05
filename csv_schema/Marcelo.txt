@@ -1,0 +1,9 @@
+0=dbase
+1=id
+2=titulo_artigo
+3=titulo_revista
+4=volume_fasciculo
+5=numero_fasciculo
+6=pagina_inicial
+9=ano_publicacao
+11=endereco_eletronico

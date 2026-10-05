@@ -1,6 +1,6 @@
 package dd.comparators
 
-import dd.interfaces.{CompResult, Comparator, Document}
+import dd.interfaces.{CompResult, Comparator, Document, SimilarityStatus}
 import dd.tools.StringSimilarity.DiceCoefficient
 import org.apache.commons.csv.CSVFormat
 
@@ -42,25 +42,26 @@ class AuthorsComparator(fieldName: String,
      * Builds a comparison result for the current author sets.
      *
      * @param score score assigned to the generated comparison result
-     * @param isSimilar flag indicating whether the compared values matched
+     * @param status final similarity status for the generated comparison result
      * @return comparison result created for the current author sets
      */
     def buildResult(score: Int,
-                    isSimilar: Boolean): CompResult =
-      CompResult("AuthorsComparator", fieldName, originalAuthors, currentAuthors, None, None, score, isSimilar)
+                    status: SimilarityStatus): CompResult =
+      CompResult("AuthorsComparator", fieldName, originalAuthors, currentAuthors, None, None, score, status)
 
     if originalAuthors.trim.isEmpty && currentAuthors.trim.isEmpty then
-      buildResult(score = 0, isSimilar = false)
+      buildResult(score = 1, status = SimilarityStatus.yes)
     else if rawOriSeq.isEmpty != rawCurSeq.isEmpty then
-      buildResult(score = 0, isSimilar = false)
+      buildResult(score = 0, status = SimilarityStatus.undefined)
     else
       val (fromSeq, toSeq) = if oriSeq.length <= curSeq.length then (oriSeq, curSeq) else (curSeq, oriSeq)
 
       if fromSeq.length < toSeq.length * 0.8 then
-        buildResult(score = 0, isSimilar = false)
+        buildResult(score = 0, status = SimilarityStatus.no)
       else
         val isSimilar: Boolean = fromSeq.forall(existSimilar(_, toSeq))
-        buildResult(score = if isSimilar then 1 else 0, isSimilar = isSimilar)
+        val status = if isSimilar then SimilarityStatus.yes else SimilarityStatus.no
+        buildResult(score = if isSimilar then 1 else 0, status = status)
 
   /**
    * Extracts and normalizes the authors stored in the selected field.
@@ -92,7 +93,12 @@ class AuthorsComparator(fieldName: String,
     else if field.contains(";") then separateBySemicolon(field)
     else Seq(field.trim)
 
-  /** Splits an author field into non-empty semicolon-separated values. */
+  /**
+   * Splits an author field into non-empty semicolon-separated values.
+   *
+   * @param field author field value
+   * @return non-empty author values
+   */
   private def separateBySemicolon(field: String): Seq[String] =
     CSVFormat.Builder.create().setDelimiter(';').setTrim(true).get().
       parse(new StringReader(field)).asScala.head.asScala.toSeq.map(_.trim)
@@ -207,6 +213,6 @@ object AuthorsComparator:
         val currentDoc: Document = Document(Seq("authors" -> right))
         val result: CompResult = new AuthorsComparator("authors").compare(originalDoc, currentDoc)
 
-        Option.when(!result.isSimilar)(Seq(result.originalField, result.currentField, "")).foreach(_.foreach(println))
+        Option.when(result.isSimilar != SimilarityStatus.yes)(Seq(result.originalField, result.currentField, "")).foreach(_.foreach(println))
       case _ =>
         println(s"Invalid line format: $line")

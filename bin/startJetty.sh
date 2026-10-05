@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [ -z "$JAVA_HOME_25" ]; then
+  JAVA_HOME_25="/home/users/operacao/.cache/coursier/arc/https/github.com/graalvm/graalvm-ce-builds/releases/download/jdk-25.0.1/graalvm-community-jdk-25.0.1_linux-x64_bin.tar.gz/graalvm-community-openjdk-25.0.1+8.1"
+fi
+PATH=$JAVA_HOME_25/bin:$PATH
+JAVA_HOME=$JAVA_HOME_25
+
 project_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 pid_file="$project_dir/server/jetty.pid"
 log_file="$project_dir/server/jetty.log"

@@ -5,6 +5,9 @@ if [ -z "$JAVA_HOME_25" ]; then
 fi
 PATH=$JAVA_HOME_25/bin:$PATH
 
+export JAVA_HOME=$JAVA_HOME_25
+
+
 if [ "$#" -lt "4" ]
   then
     echo 'Command-line utility that converts CSV input into a Lucene index.'

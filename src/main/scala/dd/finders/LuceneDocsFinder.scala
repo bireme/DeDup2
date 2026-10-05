@@ -2,7 +2,7 @@ package dd.finders
 
 import dd.NGAnalyzer
 import dd.interfaces.{DocsFinder, DocsProducer, Document}
-import dd.tools.StringSimilarity.DiceCoefficient
+import dd.tools.StringSimilarity.LevenshteinJaccard
 import dd.tools.Tools
 import org.apache.lucene.document
 import org.apache.lucene.analysis.TokenStream
@@ -57,7 +57,7 @@ class LuceneDocsFinder(luceneIndex: String,
       val parser: QueryParser = new QueryParser(searchField, analyzer)
       val qur: Query = buildQuery(searchField, query, auxQuery, parser)
       val hits: Array[ScoreDoc] = isearcher.search(qur, maxDocs).scoreDocs
-      val normalizedQuery = Tools.normalizeStr(query)
+      val normalizedQuery = Tools.normalizeWordsStr(query)
       val scoreDocs: Iterator[ScoreDoc] = hits.iterator
 
       new DocsProducer:
@@ -96,7 +96,13 @@ class LuceneDocsFinder(luceneIndex: String,
 
       builder.build()
 
-  /** Returns analyzer tokens for the supplied query text. */
+  /**
+   * Returns analyzer tokens for the supplied query text.
+   *
+   * @param searchField field whose analyzer is used
+   * @param value text to tokenize
+   * @return analyzed query tokens
+   */
   private def analyzedTokens(searchField: String,
                              value: String): Seq[String] =
     val stream: TokenStream = analyzer.tokenStream(searchField, StringReader(value))
@@ -152,9 +158,15 @@ class LuceneDocsFinder(luceneIndex: String,
         exception.printStackTrace()
         LazyList[Document]()
 
-  /** Determines whether a candidate score meets the configured threshold. */
+  /**
+   * Determines whether a candidate meets the configured threshold.
+   *
+   * @param normalizedQuery normalized source query
+   * @param candidate candidate field value
+   * @return true when the candidate meets the configured threshold
+   */
   private def isSimilar(normalizedQuery: String,
                         candidate: String): Boolean =
-    val normalizedCandidate = Tools.normalizeStr(Option(candidate).getOrElse(""))
+    val normalizedCandidate = Tools.normalizeWordsStr(Option(candidate).getOrElse(""))
     normalizedQuery.nonEmpty && normalizedCandidate.nonEmpty &&
-      DiceCoefficient.score(normalizedQuery, normalizedCandidate) >= minSimilarity
+      LevenshteinJaccard.score(normalizedQuery, normalizedCandidate) >= minSimilarity

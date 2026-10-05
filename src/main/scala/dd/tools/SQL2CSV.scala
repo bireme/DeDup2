@@ -154,7 +154,6 @@ object SQL2CSV:
    *
    * @param conf database configuration used during export
    * @param outCsvFile destination CSV file path
-   * @param fieldSeparator CSV field separator
    * @return result of exporting the records
    */
   def exportRecords(conf: MySqlProducerConfig,
@@ -180,7 +179,6 @@ object SQL2CSV:
    * @param conf base database configuration used during export
    * @param sqlFiles SQL files executed sequentially
    * @param outCsvFile destination CSV file path
-   * @param fieldSeparator CSV field separator
    * @return result of exporting the records
    */
   def exportRecords(conf: MySqlProducerConfig,
@@ -250,14 +248,24 @@ object SQL2CSV:
             case many => Json.stringify(JsArray(many))
         key -> value
 
-  /** Converts a string value to a JSON value suitable for CSV export. */
+  /**
+   * Converts a string value to a JSON value suitable for CSV export.
+   *
+   * @param value source string value
+   * @return JSON representation of the value
+   */
   private def csvFieldValue(value: String): JsValue =
     val trimmed = Option(value).getOrElse("").trim
     if trimmed.startsWith("[") || trimmed.startsWith("{") then
       Try(Json.parse(trimmed)).getOrElse(JsString(trimmed))
     else JsString(trimmed)
 
-  /** Converts a JSON value to its CSV text representation. */
+  /**
+   * Converts a JSON value to its CSV text representation.
+   *
+   * @param value JSON value to convert
+   * @return CSV-compatible text
+   */
   private def stringifyCsvFieldValue(value: JsValue): String =
     value match
       case JsString(text) => text

@@ -1,8 +1,8 @@
 package dd.producers
 
-import org.bson.{Document as BsonDocument}
+import org.bson.Document as BsonDocument
 
-import java.util.Arrays
+import java.util
 
 class MongoDBProducerSuite extends munit.FunSuite:
   test("toDocument converts top-level BSON fields to internal document fields"):
@@ -25,7 +25,7 @@ class MongoDBProducerSuite extends munit.FunSuite:
   test("toDocument joins arrays with the default field separator and preserves nested documents as JSON"):
     val nested = new BsonDocument().append("city", "Sao Paulo")
     val bson = new BsonDocument()
-      .append("author", Arrays.asList("Ana", "Joao"))
+      .append("author", util.Arrays.asList("Ana", "Joao"))
       .append("address", nested)
 
     val document = MongoDBProducer.toDocument(bson, None).get
@@ -59,7 +59,7 @@ class MongoDBProducerSuite extends munit.FunSuite:
 
   test("toDocument extracts subfields from arrays of documents and joins them"):
     val bson = new BsonDocument()
-      .append("authors", Arrays.asList(
+      .append("authors", util.Arrays.asList(
         new BsonDocument().append("name", "Ana"),
         new BsonDocument().append("name", "Joao")
       ))

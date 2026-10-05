@@ -3,7 +3,7 @@ package server
 import dd.comparators.DiceComparator
 import dd.configurators.ConfMain
 import dd.finders.LuceneDocsFinder
-import dd.interfaces.{Comparator, Document}
+import dd.interfaces.{Comparator, Document, SimilarityStatus}
 import jakarta.servlet.http.{HttpServlet, HttpServletRequest, HttpServletResponse}
 import org.eclipse.jetty.ee11.servlet.{ServletContextHandler, ServletHolder}
 import org.eclipse.jetty.server.Server as JettyServer
@@ -19,7 +19,10 @@ import scala.util.{Failure, Success, Try, Using}
 object Server:
   private val DefaultPort = 8080
 
-  /** Starts the HTTP server using the configured database registry. */
+  /**
+   * Starts the HTTP server using the configured database registry.
+   * @param args optional server command-line arguments
+   */
   def main(args: Array[String]): Unit =
     val port = parsePort(args).fold(error => throw new IllegalArgumentException(error), identity)
     val configFile = Paths.get(System.getProperty("server.config", "server/config.cfg"))
@@ -35,7 +38,11 @@ object Server:
     jetty.start()
     jetty.join()
 
-  /** Parses the optional server port argument. */
+  /**
+   * Parses the optional server port argument.
+   * @param args server command-line arguments
+   * @return parsed port or an error message
+   */
   private def parsePort(args: Array[String]): Either[String, Int] =
     args.toSeq match
       case Seq() => Right(DefaultPort)
@@ -56,11 +63,19 @@ private final case class ComparatorField(fieldName: String,
 
 private final case class DatabaseRegistry(databases: Seq[DatabaseDefinition],
                                           errors: Seq[String]):
-  /** Finds a database definition by its configured name. */
+  /**
+   * Finds a database definition by its configured name.
+   * @param name configured database name
+   * @return matching definition, when present
+   */
   def find(name: String): Option[DatabaseDefinition] = databases.find(_.name == name)
 
 private object DatabaseRegistry:
-  /** Loads and validates all database entries from the registry file. */
+  /**
+   * Loads and validates all database entries from the registry file.
+   * @param configFile registry configuration path
+   * @return loaded database registry
+   */
   def load(configFile: Path): DatabaseRegistry =
     val absoluteConfig = configFile.toAbsolutePath.normalize
     val projectRoot = Option(absoluteConfig.getParent).flatMap(parent => Option(parent.getParent))
@@ -125,7 +140,11 @@ private object DatabaseRegistry:
       .distinctBy(_.fieldName)
       .toSeq
 
-  /** Converts a configured comparator key to its display name. */
+  /**
+   * Converts a configured comparator key to its display name.
+   * @param name configured comparator key
+   * @return human-readable comparator name
+   */
   private def displayComparatorName(name: String): String =
     name match
       case "dice" => "DiceComparator"
@@ -133,6 +152,7 @@ private object DatabaseRegistry:
       case "ngram" => "NGramComparator"
       case "regex" => "RegexComparator"
       case "authors" => "AuthorsComparator"
+      case "urls" => "UrlsComparator"
       case other => other
 
 private final class SimilarDocsServlet(configFile: Path) extends HttpServlet:
@@ -149,7 +169,11 @@ private final class SimilarDocsServlet(configFile: Path) extends HttpServlet:
     if request.getParameter("action") == "search" then render(request, response, Some(search(request)))
     else response.sendRedirect(request.getContextPath + "/")
 
-  /** Executes a similarity search for the submitted request parameters. */
+  /**
+   * Executes a similarity search for the submitted request parameters.
+   * @param request HTTP search request
+   * @return search result or an error
+   */
   private def search(request: HttpServletRequest): SearchResult =
     val registry = DatabaseRegistry.load(configFile)
     selectedDatabase(request, registry).fold(
@@ -306,7 +330,11 @@ private final class SimilarDocsServlet(configFile: Path) extends HttpServlet:
       case _ => Seq.empty
     Document((database.searchField -> query) +: comparatorValues)
 
-  /** Splits repeated field values using the configured occurrence separator. */
+  /**
+   * Splits repeated field values using the configured occurrence separator.
+   * @param value serialized repeated field value
+   * @return non-empty occurrence values
+   */
   private def occurrenceValues(value: String): Seq[String] =
     value.split(Pattern.quote(occurrenceSeparator), -1).toSeq.map(_.trim).filter(_.nonEmpty)
 
@@ -322,41 +350,80 @@ private final class SimilarDocsServlet(configFile: Path) extends HttpServlet:
       .compare(original, candidate)
     CandidateDocument(candidate, comparatorResults.updated(database.searchField, diceResult.isSimilar))
 
-  /** Builds one HTML table row from its source label and cells. */
+  /**
+   * Builds one HTML table row from its source label and cells.
+   * @param source row source label
+   * @param values cells included in the row
+   * @return rendered HTML row
+   */
   private def row(source: String, values: Seq[TableCell]): String =
     val cells = values.map: cell =>
-      val colorClass = cell.isSimilar.fold("")(isSimilar => if isSimilar then " similar-cell" else " different-cell")
+      val colorClass = cell.isSimilar.fold("") {
+        case SimilarityStatus.yes => " similar-cell"
+        case SimilarityStatus.no => " different-cell"
+        case SimilarityStatus.undefined => ""
+      }
       s"<td class=\"$colorClass\">${escape(cell.value)}</td>"
     s"<tr><th>${escape(source)}</th>${cells.mkString}</tr>"
 
-  /** Collects all values of a field from a document. */
+  /**
+   * Collects all values of a field from a document.
+   * @param document source document
+   * @param field field name to read
+   * @return joined field values
+   */
   private def fieldValue(document: Document, field: String): String =
     document.fields.collect { case (`field`, value) => value }.mkString(" | ")
 
-  /** Creates the request parameter name for a comparator field index. */
+  /**
+   * Creates the request parameter name for a comparator field index.
+   * @param index comparator field index
+   * @return request parameter name
+   */
   private def fieldParameter(index: Int): String = s"field_$index"
 
-  /** Reads a request parameter, returning an empty string when absent. */
+  /**
+   * Reads a request parameter, returning an empty string when absent.
+   * @param request HTTP request
+   * @param name parameter name
+   * @return parameter value or an empty string
+   */
   private def parameterValue(request: HttpServletRequest, name: String): String = Option(request.getParameter(name)).getOrElse("")
 
-  /** Escapes text before inserting it into HTML output. */
+  /**
+   * Escapes text before inserting it into HTML output.
+   * @param value text to escape
+   * @return HTML-safe text
+   */
   private def escape(value: String): String =
     value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&#39;")
 
-  /** Converts an exception into a non-empty display message. */
+  /**
+   * Converts an exception into a non-empty display message.
+   * @param error exception to format
+   * @return displayable error message
+   */
   private def message(error: Throwable): String = Option(error.getMessage).filter(_.nonEmpty).getOrElse(error.getClass.getSimpleName)
 
 private final case class CandidateDocument(document: Document,
-                                           similarities: Map[String, Boolean])
+                                           similarities: Map[String, SimilarityStatus])
 
 private final case class TableCell(value: String,
-                                   isSimilar: Option[Boolean])
+                                   isSimilar: Option[SimilarityStatus])
 
 private final case class SearchResult(candidates: Seq[CandidateDocument], error: Option[String])
 
 private object SearchResult:
-  /** Creates a successful search result. */
+  /**
+   * Creates a successful search result.
+   * @param candidates matching candidate documents
+   * @return successful result containing the candidates
+   */
   def success(candidates: Seq[CandidateDocument]): SearchResult = SearchResult(candidates, None)
 
-  /** Creates a failed search result with a displayable message. */
+  /**
+   * Creates a failed search result with a displayable message.
+   * @param message error message
+   * @return failed result containing the message
+   */
   def error(message: String): SearchResult = SearchResult(Seq.empty, Some(message))
