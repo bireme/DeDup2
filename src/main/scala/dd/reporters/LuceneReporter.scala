@@ -1,7 +1,7 @@
 package dd.reporters
 
 import dd.NGAnalyzer
-import dd.interfaces.{CompResult, Document, Reporter}
+import dd.interfaces.{CompResult, Document, Reporter, SimilarityStatus}
 import org.apache.lucene.document
 import org.apache.lucene.document.{Field, StoredField, TextField}
 import org.apache.lucene.index.{IndexWriter, IndexWriterConfig}
@@ -93,7 +93,7 @@ private[reporters] object LuceneReporter:
    * @return true when the result set should be written
    */
   def shouldWriteResults(results: Seq[CompResult], minTrue: Int): Boolean =
-    results.count(_.isSimilar) >= minTrue
+    results.count(_.isSimilar == SimilarityStatus.yes) >= minTrue
 
   /**
    * Builds the flat field list stored in the Lucene report document.

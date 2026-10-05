@@ -1,11 +1,14 @@
 package dd.interfaces
 
+enum SimilarityStatus:
+  case yes, no, undefined
+
 /**
  * Immutable comparison result produced by a document comparator.
  *
  * The structure keeps both the original compared values and any derived
  * representations used during matching, together with the numeric similarity
- * score and the final boolean similarity decision.
+ * score and the final similarity decision.
  */
 case class CompResult(name: String,
                       fieldName: String,
@@ -14,4 +17,4 @@ case class CompResult(name: String,
                       originalFieldOther: Option[String],
                       currentFieldOther: Option[String],
                       similarity: Double,
-                      isSimilar: Boolean)
+                      isSimilar: SimilarityStatus)

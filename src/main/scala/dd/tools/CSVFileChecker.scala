@@ -1,6 +1,6 @@
 package dd.tools
 
-import scala.annotation.unused
+import scala.annotation.{tailrec, unused}
 import scala.io.Source
 import scala.util.{Failure, Success, Try, Using}
 
@@ -98,15 +98,14 @@ object CSVFileChecker:
    * @param fieldSeparator field separator used in the CSV input
    * @param encoding character encoding used to read the input file
    * @param stopAfter value of stop after
-   * @param reportFile optional path for the generated report
    * @return result of processing the CSV file
    */
-  def processFile(csvFile: String,
-                  numberOfFields: Int,
-                  fieldSeparator: Char,
-                  encoding: String,
-                  stopAfter: Int,
-                  @unused reportFile: Option[String]): Try[Unit] =
+  private def processFile(csvFile: String,
+                          numberOfFields: Int,
+                          fieldSeparator: Char,
+                          encoding: String,
+                          stopAfter: Int,
+                          @unused reportFile: Option[String]): Try[Unit] =
     Using(Source.fromFile(csvFile, encoding)):
       source =>
       require(numberOfFields > 0, "numberOfFields parameter should be a positive number")
@@ -136,6 +135,7 @@ object CSVFileChecker:
        * @param curLine current line number in the input iteration
        * @return no value; this method advances the line iteration in place
        */
+      @tailrec
       def loop(curLine: Int): Unit =
         if hasNext(lines, curLine) then
           if curLine % 10000 == 0 then println(s"+++$curLine")

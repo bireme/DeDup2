@@ -1,6 +1,6 @@
 package dd.reporters
 
-import _root_.dd.interfaces.{CompResult, Document}
+import _root_.dd.interfaces.{CompResult, Document, SimilarityStatus}
 import play.api.libs.json.{JsArray, JsNull, Json}
 
 import java.io.StringWriter
@@ -26,7 +26,7 @@ class JsonReporterSuite extends munit.FunSuite:
       None,
       None,
       1.0,
-      isSimilar = true
+      isSimilar = SimilarityStatus.yes
     )
 
     val written = reporter.writeResults(originalDoc, currentDoc, Seq("id"), Seq(result))
@@ -40,7 +40,7 @@ class JsonReporterSuite extends munit.FunSuite:
     assertEquals((json \ 0 \ "results" \ 0 \ "comparator").as[String], "NGramComparator")
     assertEquals((json \ 0 \ "results" \ 0 \ "field").as[String], "title")
     assertEquals((json \ 0 \ "results" \ 0 \ "similarity").as[Double], 1.0)
-    assertEquals((json \ 0 \ "results" \ 0 \ "isSimilar").as[String], "true")
+    assertEquals((json \ 0 \ "results" \ 0 \ "isSimilar").as[String], "yes")
 
   test("writeResults serializes empty values as JSON null"):
     val writer = new StringWriter()
@@ -54,8 +54,8 @@ class JsonReporterSuite extends munit.FunSuite:
       "",
       None,
       None,
-      0.0,
-      isSimilar = false
+      1.0,
+      isSimilar = SimilarityStatus.yes
     )
 
     val written = reporter.writeResults(originalDoc, currentDoc, Seq("id"), Seq(result))
@@ -67,7 +67,8 @@ class JsonReporterSuite extends munit.FunSuite:
     assertEquals((json \ 0 \ "fields" \ "id" \ "current").as[String], "2")
     assertEquals((json \ 0 \ "results" \ 0 \ "originalField").get, JsNull)
     assertEquals((json \ 0 \ "results" \ 0 \ "currentFieldOther").get, JsNull)
-    assertEquals((json \ 0 \ "results" \ 0 \ "isSimilar").as[String], "maybe")
+    assertEquals((json \ 0 \ "results" \ 0 \ "similarity").as[Double], 1.0)
+    assertEquals((json \ 0 \ "results" \ 0 \ "isSimilar").as[String], "yes")
 
   test("writeResults skips rows below minTrue and closes as empty array"):
     val writer = new StringWriter()
@@ -80,7 +81,7 @@ class JsonReporterSuite extends munit.FunSuite:
       None,
       None,
       0.0,
-      isSimilar = false
+      isSimilar = SimilarityStatus.no
     )
 
     val written = reporter.writeResults(
@@ -105,7 +106,7 @@ class JsonReporterSuite extends munit.FunSuite:
       None,
       None,
       1.0,
-      isSimilar = true
+      isSimilar = SimilarityStatus.yes
     )
 
     val written = reporter.writeResults(
@@ -117,3 +118,20 @@ class JsonReporterSuite extends munit.FunSuite:
 
     assert(written.isSuccess)
     assertEquals(writer.flushCount, 1)
+
+  test("writeResults pretty prints JSON when prettyPrint is enabled"):
+    val writer = new StringWriter()
+    val reporter = new JsonReporter(writer, minTrue = 1, prettyPrint = true)
+    val result = CompResult("ExactComparator", "title", "same", "same", None, None, 1.0, isSimilar = SimilarityStatus.yes)
+
+    reporter.writeResults(
+      Document(Seq("id" -> "1")),
+      Document(Seq("id" -> "2")),
+      Seq("id"),
+      Seq(result)
+    )
+    reporter.close()
+
+    val output: String = writer.toString
+    assert(output.contains("\n  \"fields\""))
+    assert(Json.parse(output).as[JsArray].value.nonEmpty)

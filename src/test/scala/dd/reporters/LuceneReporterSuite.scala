@@ -1,7 +1,7 @@
 package dd.reporters
 
 import _root_.dd.NGAnalyzer
-import _root_.dd.interfaces.{CompResult, Document}
+import _root_.dd.interfaces.{CompResult, Document, SimilarityStatus}
 import org.apache.lucene.index.DirectoryReader
 import org.apache.lucene.queryparser.classic.QueryParser
 import org.apache.lucene.search.IndexSearcher
@@ -30,7 +30,7 @@ class LuceneReporterSuite extends munit.FunSuite:
       Some("saopaulomedicine"),
       Some("saopaulomedicine"),
       1.0,
-      isSimilar = true
+      isSimilar = SimilarityStatus.yes
     )
 
     val written = reporter.writeResults(
@@ -66,8 +66,8 @@ class LuceneReporterSuite extends munit.FunSuite:
   test("writeResults applies minTrue threshold"):
     val indexDir = Files.createTempDirectory("dedup2-lucene-reporter-mintrue")
     val reporter = new LuceneReporter(indexDir.toString, "originalField", minTrue = 2)
-    val similarResult = CompResult("NGramComparator", "title", "a", "a", None, None, 1.0, isSimilar = true)
-    val differentResult = CompResult("ExactComparator", "year", "2020", "2021", None, None, 0.0, isSimilar = false)
+    val similarResult = CompResult("NGramComparator", "title", "a", "a", None, None, 1.0, isSimilar = SimilarityStatus.yes)
+    val differentResult = CompResult("ExactComparator", "year", "2020", "2021", None, None, 0.0, isSimilar = SimilarityStatus.no)
 
     reporter.writeResults(
       Document(Seq("id" -> "1")),
@@ -85,8 +85,8 @@ class LuceneReporterSuite extends munit.FunSuite:
     reader.close()
     directory.close()
 
-  test("reportFields serializes similarity as maybe when a compared field is empty"):
-    val result = CompResult("NGramComparator", "title", "", "present", None, None, 0.0, isSimilar = false)
+  test("reportFields serializes similarity as undefined when a compared field is empty"):
+    val result = CompResult("NGramComparator", "title", "", "present", None, None, 0.0, isSimilar = SimilarityStatus.undefined)
 
     val fields = LuceneReporter.reportFields(
       Document(Seq("id" -> "1")),
@@ -95,4 +95,4 @@ class LuceneReporterSuite extends munit.FunSuite:
       Seq(result)
     )
 
-    assertEquals(fields.collectFirst { case ("isSimilar", value) => value }, Some("maybe"))
+    assertEquals(fields.collectFirst { case ("isSimilar", value) => value }, Some("undefined"))

@@ -67,11 +67,19 @@ object SimplifyResults:
       total <- simplify(config)
     yield total
 
-  /** Parses command-line options for the simplification tool. */
+  /**
+   * Parses command-line options for the simplification tool.
+   * @param args command-line arguments
+   * @return parsed options
+   */
   private def parseArgs(args: Array[String]): Try[Map[String, String]] =
     Tools.parseCommandLineArgs(args)
 
-  /** Builds the simplification configuration from parsed options. */
+  /**
+   * Builds the simplification configuration from parsed options.
+   * @param parameters parsed command-line options
+   * @return validated simplification configuration
+   */
   private def parseConfig(parameters: Map[String, String]): Try[Config] =
     for
       host <- required(parameters, "mongodbHost")
@@ -104,14 +112,22 @@ object SimplifyResults:
       case Some(value) => Success(value)
       case None => Failure(IllegalArgumentException(usageMessage))
 
-  /** Parses a positive MongoDB port number. */
+  /**
+   * Parses a positive MongoDB port number.
+   * @param value textual port value
+   * @return parsed port or a validation failure
+   */
   private def parsePort(value: String): Try[Int] =
     Try(value.toInt).flatMap:
       port =>
         if port > 0 then Success(port)
         else Failure(IllegalArgumentException(s"Invalid mongodbPort [$value]. Expected a positive integer."))
 
-  /** Copies source documents after simplifying comparison result fields. */
+  /**
+   * Copies source documents after simplifying comparison result fields.
+   * @param config simplification configuration
+   * @return result containing the number of copied documents
+   */
   private def simplify(config: Config): Try[Long] =
     val uri = s"mongodb://${config.host}:${config.port}"
     val client = MongoClients.create(uri)
@@ -147,7 +163,11 @@ object SimplifyResults:
       flush(destination, buffer).map(_ => total)
     finally closeCursor(cursor)
 
-  /** Removes internal fields and normalizes similarity values in a document. */
+  /**
+   * Removes internal fields and normalizes similarity values in a document.
+   * @param source source MongoDB document
+   * @return simplified document
+   */
   private[tools] def simplifyDocument(source: Document): Document =
     source.entrySet().asScala.foldLeft(new Document()):
       case (destination, entry) =>
@@ -159,18 +179,30 @@ object SimplifyResults:
         else if isObject(value) then destination.append(key, simplifiedSimilarityValue(value))
         else destination.append(key, value)
 
-  /** Indicates whether a MongoDB field is internal to the workflow. */
+  /**
+   * Indicates whether a MongoDB field is internal to the workflow.
+   * @param key field name
+   * @return true when the field should be omitted
+   */
   private def ignoredField(key: String): Boolean =
     key == "_id" || key == "dbase_1" || key == "dbase_2"
 
-  /** Checks whether a value is a MongoDB document or map. */
+  /**
+   * Checks whether a value is a MongoDB document or map.
+   * @param value value to inspect
+   * @return true when the value behaves as an object
+   */
   private def isObject(value: Any): Boolean =
     value match
       case _: Document => true
       case _: java.util.Map[?, ?] => true
       case _ => false
 
-  /** Simplifies a nested similarity result when it is an object. */
+  /**
+   * Simplifies a nested similarity result when it is an object.
+   * @param value value to simplify
+   * @return simplified value
+   */
   private def simplifiedSimilarityValue(value: Any): Any =
     val isSimilar = value match
       case document: Document => Option(document.get("isSimilar"))
@@ -179,14 +211,22 @@ object SimplifyResults:
 
     isSimilar.map(normalizeSimilarityValue).getOrElse("?")
 
-  /** Extracts the similarity value from a nested result object. */
+  /**
+   * Extracts the similarity value from a nested result object.
+   * @param value nested result value
+   * @return extracted similarity value
+   */
   private def similarityValue(value: Any): Any =
     value match
       case document: Document => Option(document.get("similarity")).getOrElse("")
       case map: java.util.Map[?, ?] => Option(map.get("similarity")).getOrElse("")
       case _ => ""
 
-  /** Converts a similarity value to its compact output form. */
+  /**
+   * Converts a similarity value to its compact output form.
+   * @param value similarity value
+   * @return normalized output value
+   */
   private def normalizeSimilarityValue(value: Any): Any =
     value match
       case boolean: java.lang.Boolean => if boolean then 1 else 0
@@ -206,6 +246,9 @@ object SimplifyResults:
         destination.insertMany(buffer.asJava, new InsertManyOptions().ordered(false))
         buffer.clear()
 
-  /** Closes a MongoDB cursor while ignoring cleanup failures. */
+  /**
+   * Closes a MongoDB cursor while ignoring cleanup failures.
+   * @param cursor cursor to close
+   */
   private def closeCursor(cursor: MongoCursor[Document]): Unit =
     Try(cursor.close())

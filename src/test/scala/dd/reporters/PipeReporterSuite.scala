@@ -1,6 +1,6 @@
 package dd.reporters
 
-import _root_.dd.interfaces.{CompResult, Document}
+import _root_.dd.interfaces.{CompResult, Document, SimilarityStatus}
 
 import java.io.StringWriter
 
@@ -25,7 +25,7 @@ class PipeReporterSuite extends munit.FunSuite:
       None,
       None,
       1.0,
-      isSimilar = true
+      isSimilar = SimilarityStatus.yes
     )
 
     val written = reporter.writeResults(originalDoc, currentDoc, Seq("id"), Seq(result))
@@ -34,7 +34,7 @@ class PipeReporterSuite extends munit.FunSuite:
     assertEquals(
       writer.toString,
       "id_1|id_2|Comparator|Field|originalField|currentField|originalFieldOther|currentFieldOther|Similarity|isSimilar\n" +
-        "1|2|NGramComparator|title|same title|same title|null|null|1.0|true"
+        "1|2|NGramComparator|title|same title|same title|null|null|1.0|yes"
     )
 
   test("writeResults replaces empty fields with null"):
@@ -49,8 +49,8 @@ class PipeReporterSuite extends munit.FunSuite:
       "",
       None,
       None,
-      0.0,
-      isSimilar = false
+      1.0,
+      isSimilar = SimilarityStatus.yes
     )
 
     val written = reporter.writeResults(originalDoc, currentDoc, Seq("id"), Seq(result))
@@ -58,7 +58,7 @@ class PipeReporterSuite extends munit.FunSuite:
     assert(written.isSuccess)
     assertEquals(
       writer.toString,
-      "null|2|NGramComparator|title|null|null|null|null|0.0|maybe"
+      "null|2|NGramComparator|title|null|null|null|null|1.0|yes"
     )
 
   test("writeResults exports original and other comparison fields separately"):
@@ -72,7 +72,7 @@ class PipeReporterSuite extends munit.FunSuite:
       Some("saopaulo"),
       Some("saopaulo"),
       1.0,
-      isSimilar = true
+      isSimilar = SimilarityStatus.yes
     )
 
     val written = reporter.writeResults(
@@ -85,7 +85,7 @@ class PipeReporterSuite extends munit.FunSuite:
     assert(written.isSuccess)
     assertEquals(
       writer.toString,
-      "NGramComparator|title|São Paulo|Sao Paulo|saopaulo|saopaulo|1.0|true"
+      "NGramComparator|title|São Paulo|Sao Paulo|saopaulo|saopaulo|1.0|yes"
     )
 
   test("writeResults keeps one output column for each other field side"):
@@ -101,7 +101,7 @@ class PipeReporterSuite extends munit.FunSuite:
       None,
       None,
       1.0,
-      isSimilar = true
+      isSimilar = SimilarityStatus.yes
     )
 
     val written = reporter.writeResults(originalDoc, currentDoc, Seq("id", "missing"), Seq(result))
@@ -110,7 +110,7 @@ class PipeReporterSuite extends munit.FunSuite:
     assertEquals(
       writer.toString,
       "id_1|id_2|missing_1|missing_2|Comparator|Field|originalField|currentField|originalFieldOther|currentFieldOther|Similarity|isSimilar\n" +
-        "1|null|null|null|NGramComparator|title|same title|same title|null|null|1.0|true"
+        "1|null|null|null|NGramComparator|title|same title|same title|null|null|1.0|yes"
     )
 
   test("writeResults flushes immediately when flushResults is enabled"):
@@ -124,7 +124,7 @@ class PipeReporterSuite extends munit.FunSuite:
       None,
       None,
       1.0,
-      isSimilar = true
+      isSimilar = SimilarityStatus.yes
     )
 
     val written = reporter.writeResults(

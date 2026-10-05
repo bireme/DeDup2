@@ -2,7 +2,7 @@ package dd.reporters
 
 import com.mongodb.client.model.InsertManyOptions
 import com.mongodb.client.{MongoClient, MongoClients, MongoCollection, MongoDatabase}
-import dd.interfaces.{CompResult, Document, Reporter}
+import dd.interfaces.{CompResult, Document, Reporter, SimilarityStatus}
 import org.bson
 
 import scala.collection.mutable
@@ -154,7 +154,7 @@ private[reporters] object MongoDBReporter:
    * @return true when the result set should be written
    */
   def shouldWriteResults(results: Seq[CompResult], minTrue: Int): Boolean =
-    results.count(_.isSimilar) >= minTrue
+    results.count(_.isSimilar == SimilarityStatus.yes) >= minTrue
 
   /**
    * Converts a single comparison result into the nested BSON format persisted by

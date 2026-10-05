@@ -1,11 +1,11 @@
 package dd.configurators
 
-import dd.comparators.{AuthorsComparator, DiceComparator, ExactComparator, JaccardComparator, LevenshteinComparator, LevenshteinJaccardComparator, NGramComparator, RegexComparator}
+import dd.comparators.{AuthorsComparator, DiceComparator, ExactComparator, JaccardComparator, LevenshteinComparator, LevenshteinJaccardComparator, NGramComparator, RegexComparator, UrlsComparator}
 import dd.finders.LuceneDocsFinder
-import dd.heuristics.{DirevHeuristic, LilacsMntHeuristic, LilacsMntamHeuristic, LilacsSasHeuristic, LilacsSasSourceHeuristic, LisHeuristic}
+import dd.heuristics.{DirevHeuristic, LilacsMntHeuristic, LilacsMntamHeuristic, LilacsSasHeuristic, LilacsSasSourceHeuristic, LisHeuristic, MarceloHeuristic}
 import dd.interfaces.{Comparator, DocsFinder, DocsProducer, Heuristics, Reporter}
-import dd.producers.{CSVProducer, JsonProducer, MongoDBProducer, MongoDBProducerConfig, MySqlProducerConfig, MysqlProducer}
-import dd.reporters.{JsonReporter, LuceneReporter, MongoDBReporter, PipeReporter}
+import dd.producers.{CSVProducer, JsonProducer, LuceneProducer, MongoDBProducer, MongoDBProducerConfig, MySqlProducerConfig, MysqlProducer}
+import dd.reporters.{ConsoleReporter, JsonReporter, LuceneReporter, MongoDBReporter, PipeReporter}
 import play.api.libs.json.{JsArray, JsLookupResult, JsObject, JsValue, Json}
 
 import java.io.{BufferedWriter, File}
@@ -128,7 +128,9 @@ object ConfMain:
     "LilacsMntHeuristic" -> (() => new LilacsMntHeuristic),
     "dd.heuristics.LilacsMntHeuristic" -> (() => new LilacsMntHeuristic),
     "LilacsMntamHeuristic" -> (() => new LilacsMntamHeuristic),
-    "dd.heuristics.LilacsMntamHeuristic" -> (() => new LilacsMntamHeuristic)
+    "dd.heuristics.LilacsMntamHeuristic" -> (() => new LilacsMntamHeuristic),
+    "MarceloHeuristic" -> (() => new MarceloHeuristic),
+    "dd.heuristics.MarceloHeuristic" -> (() => new MarceloHeuristic)
   )
 
   /**
@@ -338,6 +340,7 @@ object ConfMain:
     val map: collection.Map[String, JsValue] = json.value
     if map.contains("csv") then parseCSVProducer(map("csv").as[JsObject])
     else if map.contains("json") then parseJsonProducer(map("json").as[JsObject])
+    else if map.contains("lucene") then parseLuceneProducer(map("lucene").as[JsObject])
     else if map.contains("mysql") then parseMysqlProducer(map("mysql").as[JsObject])
     else if map.contains("mongoDB") then parseMongoDBProducer(map("mongoDB").as[JsObject])
     else if map.contains("mongodb") then parseMongoDBProducer(map("mongodb").as[JsObject])
@@ -400,6 +403,20 @@ object ConfMain:
         .getOrElse(throw new IllegalArgumentException("Missing 'input'")),
       fields = optionalStringSeq(map, "fields"),
       encoding = optionalString(map, "encoding").getOrElse("utf-8")
+    )
+
+  /**
+   * Parses a Lucene source producer configuration.
+   *
+   * @param json JSON object containing the Lucene producer configuration
+   * @return configured Lucene producer
+   */
+  private def parseLuceneProducer(json: JsObject): LuceneProducer =
+    val map: collection.Map[String, JsValue] = json.value
+    new LuceneProducer(
+      indexPath = requiredString(map, "index"),
+      search = optionalString(map, "search"),
+      fields = optionalStringSeq(map, "fields")
     )
 
   /**
@@ -496,7 +513,11 @@ object ConfMain:
       parseLuceneMinSimilarity(lucene)
     )
 
-  /** Reads and validates the Lucene minimum similarity setting. */
+  /**
+   * Reads and validates the Lucene minimum similarity setting.
+   * @param lucene Lucene configuration object
+   * @return validated minimum similarity
+   */
   private def parseLuceneMinSimilarity(lucene: JsLookupResult): Double =
     val value: Double = (lucene \ "minSimilarity").asOpt[Double]
       .getOrElse(throw new IllegalArgumentException("Missing 'finder/lucene/minSimilarity'"))
@@ -504,7 +525,11 @@ object ConfMain:
       throw new IllegalArgumentException("'finder/lucene/minSimilarity' must be between 0.0 and 1.0")
     value
 
-  /** Reads the configured document worker parallelism. */
+  /**
+   * Reads the configured document worker parallelism.
+   * @param json root configuration object
+   * @return validated worker count
+   */
   private def parseDocumentParallelism(json: JsValue): Int =
     val default = Runtime.getRuntime.availableProcessors().max(1)
     val value = (json \ "documentParallelism").asOpt[Int]
@@ -561,6 +586,7 @@ object ConfMain:
     else if map.contains("ngram") then parseNGramComparator(map("ngram").as[JsObject])
     else if map.contains("regex") then parseRegexComparator(map("regex").as[JsObject])
     else if map.contains("authors") then parseAuthorsComparator(map("authors").as[JsObject])
+    else if map.contains("urls") then parseUrlsComparator(map("urls").as[JsObject])
     else throw new IllegalArgumentException(s"Invalid comparator: $jsonStr")
 
   /**
@@ -578,6 +604,9 @@ object ConfMain:
     else if map.contains("json") then
       val json = map("json").as[JsObject]
       ConfiguredReporter(parseJsonReporter(json), parseOtherFields(json))
+    else if map.contains("console") then
+      val json = map("console").as[JsObject]
+      ConfiguredReporter(parseConsoleReporter(json), parseOtherFields(json))
     else if map.contains("mongoDB") then
       val json = map("mongoDB").as[JsObject]
       ConfiguredReporter(parseMongoDBReporter(json), parseOtherFields(json))
@@ -610,19 +639,31 @@ object ConfMain:
     new DiceComparator(requiredString(map, "fieldName"), requiredBoolean(map, "normalize"),
       requiredDouble(map, "minSimilarity"))
 
-  /** Parses the Levenshtein comparator configuration. */
+  /**
+   * Parses the Levenshtein comparator configuration.
+   * @param json comparator configuration object
+   * @return configured Levenshtein comparator
+   */
   private def parseLevenshteinComparator(json: JsObject): LevenshteinComparator =
     val map: collection.Map[String, JsValue] = json.value
     new LevenshteinComparator(requiredString(map, "fieldName"), requiredBoolean(map, "normalize"),
       requiredDouble(map, "minSimilarity"))
 
-  /** Parses the word-based Jaccard comparator configuration. */
+  /**
+   * Parses the word-based Jaccard comparator configuration.
+   * @param json comparator configuration object
+   * @return configured Jaccard comparator
+   */
   private def parseJaccardComparator(json: JsObject): JaccardComparator =
     val map: collection.Map[String, JsValue] = json.value
     new JaccardComparator(requiredString(map, "fieldName"), requiredBoolean(map, "normalize"),
       requiredDouble(map, "minSimilarity"))
 
-  /** Parses the combined Levenshtein-Jaccard comparator configuration. */
+  /**
+   * Parses the combined Levenshtein-Jaccard comparator configuration.
+   * @param json comparator configuration object
+   * @return configured combined comparator
+   */
   private def parseLevenshteinJaccardComparator(json: JsObject): LevenshteinJaccardComparator =
     val map: collection.Map[String, JsValue] = json.value
     new LevenshteinJaccardComparator(requiredString(map, "fieldName"), requiredBoolean(map, "normalize"),
@@ -661,6 +702,19 @@ object ConfMain:
     new AuthorsComparator(requiredString(map, "fieldName"))
 
   /**
+   * Parses the URLs comparator configuration.
+   *
+   * @param json JSON object containing the selected configuration block
+   * @return configured URLs comparator
+   */
+  private def parseUrlsComparator(json: JsObject): UrlsComparator =
+    val map: collection.Map[String, JsValue] = json.value
+    new UrlsComparator(
+      fieldName = requiredString(map, "fieldName"),
+      occSeparator = optionalString(map, "occSeparator").getOrElse("//@//")
+    )
+
+  /**
    * Parses the pipe reporter configuration.
    *
    * @param json JSON object containing the selected configuration block
@@ -688,9 +742,25 @@ object ConfMain:
       Charset.forName(encoding), StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)
     val minTrue: Int = map.get("minTrue").flatMap(_.asOpt[Int]).getOrElse(0)
     val flushResults: Boolean = map.get("flushResults").flatMap(_.asOpt[Boolean]).getOrElse(false)
-    new JsonReporter(writer, minTrue, flushResults)
+    val prettyPrint: Boolean = map.get("prettyPrint").flatMap(_.asOpt[Boolean]).getOrElse(false)
+    new JsonReporter(writer, minTrue, flushResults, prettyPrint)
 
-  /** Resolves and creates the parent directory for an output file. */
+  /**
+   * Parses the console JSON reporter configuration.
+   * @param json reporter configuration object
+   * @return configured console reporter
+   */
+  private def parseConsoleReporter(json: JsObject): ConsoleReporter =
+    val map: collection.Map[String, JsValue] = json.value
+    val minTrue: Int = map.get("minTrue").flatMap(_.asOpt[Int]).getOrElse(0)
+    new ConsoleReporter(minTrue)
+
+  /**
+   * Resolves and creates the parent directory for an output file.
+   *
+   * @param fileName output file name
+   * @return normalized output path
+   */
   private def prepareOutputFile(fileName: String): java.nio.file.Path =
     val path = new File(fileName).toPath
     Option(path.getParent).foreach(parent => Files.createDirectories(parent))

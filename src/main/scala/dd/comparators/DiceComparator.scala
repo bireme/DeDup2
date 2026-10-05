@@ -1,6 +1,6 @@
 package dd.comparators
 
-import dd.interfaces.{CompResult, Comparator, Document}
+import dd.interfaces.{CompResult, Comparator, Document, SimilarityStatus}
 import dd.tools.StringSimilarity.DiceCoefficient
 import dd.tools.Tools
 
@@ -33,8 +33,17 @@ class DiceComparator(val fieldName: String,
     val cString: String = cFields.map(_.trim).mkString(fieldSeparator)
     val oString2: String = if normalize then Tools.normalizeStr(oString) else oString
     val cString2: String = if normalize then Tools.normalizeStr(cString) else cString
-    val bothEmpty: Boolean = oString2.isEmpty && cString2.isEmpty
-    val diceCoefficient: Double = if bothEmpty then 0d else DiceCoefficient.score(oString2, cString2)
+    val originalEmpty: Boolean = oString2.isEmpty
+    val currentEmpty: Boolean = cString2.isEmpty
+    val score: Double =
+      if originalEmpty != currentEmpty then 0.0
+      else if originalEmpty && currentEmpty then 1.0
+      else DiceCoefficient.score(oString2, cString2)
+    val status: SimilarityStatus =
+      if originalEmpty && currentEmpty then SimilarityStatus.yes
+      else if originalEmpty != currentEmpty then SimilarityStatus.undefined
+      else if score >= minSimilarity then SimilarityStatus.yes
+      else SimilarityStatus.no
     
-    CompResult("DiceComparator", fieldName, oString, cString, Some(oString2), Some(cString2), diceCoefficient,
-      !bothEmpty && diceCoefficient >= minSimilarity)
+    CompResult("DiceComparator", fieldName, oString, cString, Some(oString2), Some(cString2), score,
+      status)

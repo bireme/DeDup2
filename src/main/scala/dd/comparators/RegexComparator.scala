@@ -1,6 +1,6 @@
 package dd.comparators
 
-import dd.interfaces.{CompResult, Comparator, Document}
+import dd.interfaces.{CompResult, Comparator, Document, SimilarityStatus}
 import dd.tools.Tools
 
 import scala.util.matching.Regex
@@ -36,8 +36,15 @@ class RegexComparator(fieldName: String,
     val cString2: String = if normalize then Tools.normalizeStr(cString) else cString
     val oResult: String = re.replaceAllIn(oString2, compString)
     val cResult: String = re.replaceAllIn(cString2, compString)
-    val bothEmpty: Boolean = oResult.isEmpty && cResult.isEmpty
-    val similar: Boolean = !bothEmpty && oResult.equals(cResult)
+    val originalEmpty: Boolean = oResult.isEmpty
+    val currentEmpty: Boolean = cResult.isEmpty
+    val similar: Boolean = oResult.equals(cResult)
+    val status: SimilarityStatus =
+      if originalEmpty && currentEmpty then SimilarityStatus.yes
+      else if originalEmpty != currentEmpty then SimilarityStatus.undefined
+      else if similar then SimilarityStatus.yes
+      else SimilarityStatus.no
+    val score: Int = if status == SimilarityStatus.yes then 1 else 0
 
-    CompResult("RegexComparator", fieldName, oString, cString, Some(oResult), Some(cResult), if similar then 1 else 0,
-      similar)
+    CompResult("RegexComparator", fieldName, oString, cString, Some(oResult), Some(cResult), score,
+      status)

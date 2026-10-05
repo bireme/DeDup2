@@ -1,7 +1,7 @@
 package dd
 
-import dd.configurators.ConfMain.{SimilarDocsConfig}
-import dd.interfaces.{CompResult, Comparator, DocsFinder, DocsProducer, Document, Reporter}
+import dd.configurators.ConfMain.SimilarDocsConfig
+import dd.interfaces.{CompResult, Comparator, DocsFinder, DocsProducer, Document, Reporter, SimilarityStatus}
 
 import java.util.concurrent.atomic.AtomicInteger
 import scala.collection.mutable.ListBuffer
@@ -38,7 +38,7 @@ class SimilarDocsSuite extends munit.FunSuite:
           None,
           None,
           1.0,
-          true
+          SimilarityStatus.yes
         )
 
     val reporter = new Reporter:
@@ -98,7 +98,7 @@ class SimilarDocsSuite extends munit.FunSuite:
           None,
           None,
           0.25,
-          isSimilar = false
+          isSimilar = SimilarityStatus.no
         )
 
     val otherComparator = new Comparator:
@@ -112,7 +112,7 @@ class SimilarDocsSuite extends munit.FunSuite:
           None,
           None,
           1.0,
-          isSimilar = true
+          isSimilar = SimilarityStatus.yes
         )
 
     val reporter = new Reporter:
@@ -170,7 +170,7 @@ class SimilarDocsSuite extends munit.FunSuite:
           None,
           None,
           1.0,
-          isSimilar = true
+          isSimilar = SimilarityStatus.yes
         )
 
     val reporter = new Reporter:
@@ -221,7 +221,7 @@ class SimilarDocsSuite extends munit.FunSuite:
     val comparator = new Comparator:
       override def compare(originalDoc: Document,
                            currentDoc: Document): CompResult =
-        CompResult("NGramComparator", "title", "sample title", "sample title", None, None, 1.0, isSimilar = true)
+        CompResult("NGramComparator", "title", "sample title", "sample title", None, None, 1.0, isSimilar = SimilarityStatus.yes)
 
     val reporter = new Reporter:
       override def writeResults(originalDoc: Document,
@@ -302,7 +302,7 @@ class SimilarDocsSuite extends munit.FunSuite:
           maxRunning.accumulateAndGet(currentRunning, Math.max)
           try
             Thread.sleep(100)
-            CompResult(name, "title", "sample title", "sample title", None, None, 1.0, isSimilar = true)
+            CompResult(name, "title", "sample title", "sample title", None, None, 1.0, isSimilar = SimilarityStatus.yes)
           finally running.decrementAndGet()
 
     val reporter = new Reporter:
@@ -412,7 +412,7 @@ class SimilarDocsSuite extends munit.FunSuite:
     val comparator = new Comparator:
       override def compare(originalDoc: Document,
                            currentDoc: Document): CompResult =
-        CompResult("ExactComparator", "publication_year", "2024", "2024", None, None, 1.0, isSimilar = true)
+        CompResult("ExactComparator", "publication_year", "2024", "2024", None, None, 1.0, isSimilar = SimilarityStatus.yes)
 
     val comparators = SimilarDocs.includeIndexedFieldDiceComparator(finder, Seq(comparator))
     val result = comparators.head.compare(
@@ -423,7 +423,7 @@ class SimilarDocsSuite extends munit.FunSuite:
     assertEquals(comparators.size, 2)
     assertEquals(result.name, "DiceComparator")
     assertEquals(result.fieldName, "title")
-    assertEquals(result.isSimilar, true)
+    assertEquals(result.isSimilar, SimilarityStatus.yes)
 
   test("SimilarDocs does not duplicate DiceComparator for indexed field"):
     val finder = new DocsFinder:

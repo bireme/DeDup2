@@ -1,6 +1,6 @@
 package dd.reporters
 
-import _root_.dd.interfaces.CompResult
+import _root_.dd.interfaces.{CompResult, SimilarityStatus}
 
 class MongoDBReporterSuite extends munit.FunSuite:
   test("resultFieldFor exports CompResult nested by field name"):
@@ -12,7 +12,7 @@ class MongoDBReporterSuite extends munit.FunSuite:
       Some("originaltitle"),
       Some("currenttitle"),
       0.75,
-      isSimilar = true
+      isSimilar = SimilarityStatus.yes
     )
 
     val (fieldName, document) = MongoDBReporter.resultFieldFor(result)
@@ -24,7 +24,7 @@ class MongoDBReporterSuite extends munit.FunSuite:
     assertEquals(document.getString("originalFieldOther"), "originaltitle")
     assertEquals(document.getString("currentFieldOther"), "currenttitle")
     assertEquals(document.getDouble("similarity").doubleValue(), 0.75)
-    assertEquals(document.getString("isSimilar"), "true")
+    assertEquals(document.getString("isSimilar"), "yes")
 
   test("resultFieldFor keeps the configured field name when compared fields are empty"):
     val result = CompResult(
@@ -34,8 +34,8 @@ class MongoDBReporterSuite extends munit.FunSuite:
       "",
       None,
       None,
-      0.0,
-      isSimilar = false
+      1.0,
+      isSimilar = SimilarityStatus.yes
     )
 
     val (fieldName, document) = MongoDBReporter.resultFieldFor(result)
@@ -43,7 +43,7 @@ class MongoDBReporterSuite extends munit.FunSuite:
     assertEquals(fieldName, "title")
     assertEquals(document.getString("originalField"), "")
     assertEquals(document.getString("currentField"), "")
-    assertEquals(document.getString("isSimilar"), "maybe")
+    assertEquals(document.getString("isSimilar"), "yes")
 
     val (fieldNameWithOnlyCurrentEmpty, _) = MongoDBReporter.resultFieldFor(
       result.copy(originalField = "Original Title")
@@ -52,8 +52,8 @@ class MongoDBReporterSuite extends munit.FunSuite:
     assertEquals(fieldNameWithOnlyCurrentEmpty, "title")
 
   test("shouldWriteResults applies minTrue threshold"):
-    val similarResult = CompResult("NGramComparator", "title", "a", "a", None, None, 1.0, isSimilar = true)
-    val differentResult = CompResult("ExactComparator", "year", "2020", "2021", None, None, 0.0, isSimilar = false)
+    val similarResult = CompResult("NGramComparator", "title", "a", "a", None, None, 1.0, isSimilar = SimilarityStatus.yes)
+    val differentResult = CompResult("ExactComparator", "year", "2020", "2021", None, None, 0.0, isSimilar = SimilarityStatus.no)
 
     assertEquals(MongoDBReporter.shouldWriteResults(Seq(similarResult, differentResult), minTrue = 0), true)
     assertEquals(MongoDBReporter.shouldWriteResults(Seq(similarResult, differentResult), minTrue = 1), true)
