@@ -39,12 +39,16 @@ class LilacsSasHeuristic extends Heuristics:
     if doc == null then false
     else
       val titleComp: Double = similarity(results, titleField)
+      val authorAndPageScoresAreZero: Boolean =
+        results.find(_.fieldName == "author").exists(_.similarity == 0.0) &&
+          results.find(_.fieldName == pageField).exists(_.similarity == 0.0)
       val volume: (String, String) = values(results, volumeField)
       val issue: (String, String) = values(results, issueField)
       val page: (String, String) = values(results, pageField)
       val year: (String, String) = values(results, yearField)
 
-      if titleComp == 1.0 then
+      if authorAndPageScoresAreZero then false
+      else if titleComp == 1.0 then
         if journalSimilarity(results) == 1.0 then
           matchingFields(volume, issue, year, page) >= 3
         else if journalSimilarity(results) >= 0.8 && journalSimilarity(results) < 1.0 then
