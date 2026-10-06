@@ -17,16 +17,21 @@ class LilacsMntamHeuristic extends Heuristics:
     else
       val titleComp: Double = score(results, "title")
       val titleMonographicComp: Double = score(results, "title_monographic")
+      val authorComp: Double = score(results, "author")
+      val authorAndPageScoresAreZero: Boolean =
+        results.find(_.fieldName == "author").exists(_.similarity == 0.0) &&
+          results.find(_.fieldName == "pages").exists(_.similarity == 0.0)
       val year: (String, String) = pair(results, "publication_year")
       val pages: (String, String) = pair(results, "pages")
-      val authorMatch: Boolean = score(results, "author") >= 0.8
+      val authorMatch: Boolean = authorComp >= 0.8
       val matchingFields: Int = Seq(
         equalAndPresent(pages._1, pages._2),
         equalAndPresent(year._1, year._2),
         authorMatch
       ).count(identity)
 
-      if titleComp == 1.0 then
+      if authorAndPageScoresAreZero then false
+      else if titleComp == 1.0 then
         if titleMonographicComp == 1.0 then
           matchingFields >= 2
         else if titleMonographicComp >= 0.8 && titleMonographicComp < 1.0 then

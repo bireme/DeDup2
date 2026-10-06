@@ -17,6 +17,9 @@ class LilacsMntHeuristic extends Heuristics:
     else
       val titleComp: Double = score(results, "title_monographic")
       val authorComp: Double = score(results, "author")
+      val authorAndPageScoresAreZero: Boolean =
+        results.find(_.fieldName == "author").exists(_.similarity == 0.0) &&
+          results.find(_.fieldName == "pages_monographic").exists(_.similarity == 0.0)
       val volume: (String, String) = pair(results, "volume_serial")
       val issue: (String, String) = pair(results, "issue_number")
       val year: (String, String) = pair(results, "publication_year")
@@ -30,7 +33,8 @@ class LilacsMntHeuristic extends Heuristics:
         authorMatch
       ).count(identity)
 
-      if titleComp == 1.0 then
+      if authorAndPageScoresAreZero then false
+      else if titleComp == 1.0 then
         matchingFields >= 3
       else if titleComp >= 0.8 && titleComp < 1.0 then
         matchingFields >= 4

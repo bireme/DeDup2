@@ -18,4 +18,4 @@ Regras:
     4 das seguintes pares de variaveis sao iguais e diferentes de null (volumes, issues, paginas, anos e autores (authorComp >= 0.8))
 
 2) Se titulos são parecidos (0.8 <= titleComp < 1.0)
-  5 das seguintes pares de variaveis sao iguais e diferentes de null (revistas (journalComp >= 0.8), volumes, issues, paginas, anos e autores (authorComp >= 0.8))
+  5 das seguintes pares de variaveis sao iguais e diferentes de null (revistas (journalComp >= 0.8), volumes, issues, paginas, anos e autores (authorComp >= 0.8)). No caso dos pares paginas e autores serem direntes de null então os valores de cada par devem ser iguais.
