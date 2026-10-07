@@ -3,10 +3,12 @@ package dd.heuristics
 import dd.interfaces.{CompResult, Document, Heuristics}
 import dd.heuristics.Util.*
 
-/** Applies the LILACS/MNT duplicate-detection rules to MongoDB documents. */
+/** Identifies LILACS/MNT duplicates by title similarity and field equality. */
 class LilacsMntHeuristic extends Heuristics:
   /**
-   * Classifies a document pair using its comparator results.
+   * Classifies a pair as duplicated when its monographic title similarity is
+   * at least 0.8 and volume, issue, author, and monographic pages are all
+   * present and equal in both documents.
    *
    * @param doc document associated with the comparison pair
    * @param results comparator results for the pair
@@ -16,29 +18,17 @@ class LilacsMntHeuristic extends Heuristics:
     if doc == null then false
     else
       val titleComp: Double = score(results, "title_monographic")
-      val authorComp: Double = score(results, "author")
-      val authorAndPageScoresAreZero: Boolean =
-        results.find(_.fieldName == "author").exists(_.similarity == 0.0) &&
-          results.find(_.fieldName == "pages_monographic").exists(_.similarity == 0.0)
       val volume: (String, String) = pair(results, "volume_serial")
       val issue: (String, String) = pair(results, "issue_number")
-      val year: (String, String) = pair(results, "publication_year")
+      val author: (String, String) = pair(results, "author")
       val pages: (String, String) = pair(results, "pages_monographic")
-      val authorMatch: Boolean = authorComp >= 0.8
-      val matchingFields: Int = Seq(
+
+      titleComp >= 0.8 && Seq(
         equalAndPresent(volume._1, volume._2),
         equalAndPresent(issue._1, issue._2),
-        equalAndPresent(pages._1, pages._2),
-        equalAndPresent(year._1, year._2),
-        authorMatch
-      ).count(identity)
-
-      if authorAndPageScoresAreZero then false
-      else if titleComp == 1.0 then
-        matchingFields >= 3
-      else if titleComp >= 0.8 && titleComp < 1.0 then
-        matchingFields >= 4
-      else false
+        equalAndPresent(author._1, author._2),
+        equalAndPresent(pages._1, pages._2)
+      ).forall(identity)
 
   /**
    * Returns a comparator similarity score or zero when absent.
