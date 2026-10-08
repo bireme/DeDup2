@@ -21,33 +21,9 @@ class DirevHeuristic extends Heuristics:
   override def isDuplicated(doc: Document, results: Seq[CompResult]): Boolean =
     if doc == null then false
     else
-      val titleComp: Double = similarity(results, "title")
-      val dates: (String, String) = values(results, "start_date")
-      val urls: (String, String) = values(results, "link")
+      val titleComp: Double = Util.similarity(results, "title")
+      val dates: (String, String) = Util.values(results, "start_date")
+      val urls: (String, String) = Util.values(results, "link")
 
       if titleComp == 1.0 then equalAndPresent(urls._1, urls._2)
-      else if titleComp >= 0.7 && titleComp < 1.0 then
-        equalAndPresent(dates._1, dates._2) && equalAndPresent(urls._1, urls._2)
-      else false
-
-  /**
-   * Returns the similarity score for a comparator field.
-   *
-   * @param results comparator results to search
-   * @param fieldName comparator field name
-   * @return field similarity, or {@code 0.0} when absent
-   */
-  private def similarity(results: Seq[CompResult], fieldName: String): Double =
-    results.find(_.fieldName == fieldName).map(_.similarity).getOrElse(0.0)
-
-  /**
-   * Returns both compared values for a comparator field.
-   *
-   * @param results comparator results to search
-   * @param fieldName comparator field name
-   * @return original and current values, or empty values when absent
-   */
-  private def values(results: Seq[CompResult], fieldName: String): (String, String) =
-    results.find(_.fieldName == fieldName)
-      .map(result => (result.originalField, result.currentField))
-      .getOrElse(("", ""))
+      else equalAndPresent(dates._1, dates._2) && equalAndPresent(urls._1, urls._2)

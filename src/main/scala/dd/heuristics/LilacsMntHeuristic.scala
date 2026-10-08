@@ -17,35 +17,14 @@ class LilacsMntHeuristic extends Heuristics:
   override def isDuplicated(doc: Document, results: Seq[CompResult]): Boolean =
     if doc == null then false
     else
-      val titleComp: Double = score(results, "title_monographic")
-      val volume: (String, String) = pair(results, "volume_serial")
-      val issue: (String, String) = pair(results, "issue_number")
-      val author: (String, String) = pair(results, "author")
-      val pages: (String, String) = pair(results, "pages_monographic")
+      val volume: (String, String) = Util.values(results, "volume_serial")
+      val issue: (String, String) = Util.values(results, "issue_number")
+      val author: (String, String) = Util.values(results, "author")
+      val pages: (String, String) = Util.values(results, "pages_monographic")
 
-      titleComp >= 0.8 && Seq(
+      Seq(
         equalAndPresent(volume._1, volume._2),
         equalAndPresent(issue._1, issue._2),
         equalAndPresent(author._1, author._2),
         equalAndPresent(pages._1, pages._2)
       ).forall(identity)
-
-  /**
-   * Returns a comparator similarity score or zero when absent.
-   *
-   * @param results comparison results to search
-   * @param fieldName comparator field name
-   * @return similarity score, or zero when absent
-   */
-  private def score(results: Seq[CompResult], fieldName: String): Double =
-    results.find(_.fieldName == fieldName).map(_.similarity).getOrElse(0.0)
-
-  /**
-   * Returns the original and current values for a comparator field.
-   *
-   * @param results comparison results to search
-   * @param fieldName comparator field name
-   * @return original and current values
-   */
-  private def pair(results: Seq[CompResult], fieldName: String): (String, String) =
-    results.find(_.fieldName == fieldName).map(result => (result.originalField, result.currentField)).getOrElse(("", ""))
