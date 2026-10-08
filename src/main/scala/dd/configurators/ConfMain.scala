@@ -2,7 +2,7 @@ package dd.configurators
 
 import dd.comparators.{AuthorsComparator, DiceComparator, ExactComparator, JaccardComparator, LevenshteinComparator, LevenshteinJaccardComparator, NGramComparator, RegexComparator, UrlsComparator}
 import dd.finders.LuceneDocsFinder
-import dd.heuristics.{DirevHeuristic, LilacsMntHeuristic, LilacsMntamHeuristic, LilacsSasHeuristic, LilacsSasSourceHeuristic, LisHeuristic, MarceloHeuristic}
+import dd.heuristics.{DirevHeuristic, LilacsMntHeuristic, LilacsMntamHeuristic, LilacsSasHeuristic, LilacsSasHeuristicWeak, LilacsSasSourceHeuristic, LisHeuristic}
 import dd.interfaces.{Comparator, DocsFinder, DocsProducer, Heuristics, Reporter}
 import dd.producers.{CSVProducer, JsonProducer, LuceneProducer, MongoDBProducer, MongoDBProducerConfig, MySqlProducerConfig, MysqlProducer}
 import dd.reporters.{ConsoleReporter, JsonReporter, LuceneReporter, MongoDBReporter, PipeReporter}
@@ -119,6 +119,8 @@ object ConfMain:
   private val heuristicFactories: Map[String, () => Heuristics] = Map(
     "LilacsSasHeuristic" -> (() => new LilacsSasHeuristic),
     "dd.heuristics.LilacsSasHeuristic" -> (() => new LilacsSasHeuristic),
+    "LilacsSasHeuristicWeak" -> (() => new LilacsSasHeuristicWeak),
+    "dd.heuristics.LilacsSasHeuristicWeak" -> (() => new LilacsSasHeuristicWeak),
     "DirevHeuristic" -> (() => new DirevHeuristic),
     "dd.heuristics.DirevHeuristic" -> (() => new DirevHeuristic),
     "LisHeuristic" -> (() => new LisHeuristic),
@@ -128,9 +130,7 @@ object ConfMain:
     "LilacsMntHeuristic" -> (() => new LilacsMntHeuristic),
     "dd.heuristics.LilacsMntHeuristic" -> (() => new LilacsMntHeuristic),
     "LilacsMntamHeuristic" -> (() => new LilacsMntamHeuristic),
-    "dd.heuristics.LilacsMntamHeuristic" -> (() => new LilacsMntamHeuristic),
-    "MarceloHeuristic" -> (() => new MarceloHeuristic),
-    "dd.heuristics.MarceloHeuristic" -> (() => new MarceloHeuristic)
+    "dd.heuristics.LilacsMntamHeuristic" -> (() => new LilacsMntamHeuristic)
   )
 
   /**

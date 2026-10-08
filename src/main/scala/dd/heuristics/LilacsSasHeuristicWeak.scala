@@ -5,9 +5,9 @@ import dd.heuristics.Util.*
 
 /**
  * Identifies LILACS/Sas duplicate pairs from title similarities and
- * bibliographic field equality.
+ * bibliographic field equality using the weak heuristic variant.
  */
-class LilacsSasHeuristic extends Heuristics:
+class LilacsSasHeuristicWeak extends Heuristics:
   private val journalField: String = "title_serial"
   private val volumeField: String = "volume_serial"
   private val issueField: String = "issue_number"
@@ -29,15 +29,15 @@ class LilacsSasHeuristic extends Heuristics:
   override def isDuplicated(doc: Document, results: Seq[CompResult]): Boolean =
     if doc == null then false
     else
-      val volume: (String, String) = values(results, volumeField)
-      val issue: (String, String) = values(results, issueField)
-      val author: (String, String) = values(results, authorField)
-      val pages: (String, String) = values(results, pageField)
+      val volume: (String, String) = Util.values(results, volumeField)
+      val issue: (String, String) = Util.values(results, issueField)
+      val author: (String, String) = Util.values(results, authorField)
+      val pages: (String, String) = Util.values(results, pageField)
 
       isSimilar(results, journalField) &&
         Seq(
-          equalAndPresent(volume._1, volume._2),
-          equalAndPresent(issue._1, issue._2),
-          equalAndPresent(author._1, author._2),
-          equalAndPresent(pages._1, pages._2)
+          equalOrAbsent(volume._1, volume._2),
+          equalOrAbsent(issue._1, issue._2),
+          equalOrAbsent(author._1, author._2),
+          equalOrAbsent(pages._1, pages._2)
         ).forall(identity)

@@ -318,8 +318,11 @@ object SelfCheckDuplicated:
    * @param delegate reporter that receives non-self comparison results
    */
   private case class SelfPairSkippingReporter(delegate: Reporter) extends Reporter:
+    private val writtenPairs: mutable.Set[String] = mutable.HashSet.empty[String]
+
     /**
-     * Writes comparison results unless the compared documents represent the same record.
+     * Skips the first comparison for a self-pair and writes subsequent
+     * comparisons with the same unordered pair of document IDs.
      *
      * @param originalDoc source document used in the comparison
      * @param currentDoc candidate document being evaluated
@@ -331,7 +334,7 @@ object SelfCheckDuplicated:
                               currentDoc: Document,
                               otherFields: Seq[String],
                               results: Seq[CompResult]): Try[Unit] =
-      if sameDocument(originalDoc, currentDoc) then Success(())
+      if sameDocument(originalDoc, currentDoc) || alreadyWritten(originalDoc, currentDoc) then Success(())
       else delegate.writeResults(originalDoc, currentDoc, otherFields, results)
 
     /**
@@ -353,6 +356,30 @@ object SelfCheckDuplicated:
       Seq("dbase", "id").forall:
         field =>
           firstField(originalDoc, field).exists(value => firstField(currentDoc, field).contains(value))
+
+    /**
+     * Checks whether the unordered ID pair has already been recorded.
+     *
+     * The pair key is stored in ascending lexical ID order so that the
+     * original/current direction does not produce a different key.
+     *
+     * @param originalDoc source document used in the comparison
+     * @param currentDoc candidate document being evaluated
+     * @return true when the ID pair was already stored; false when newly stored
+     */
+    private def alreadyWritten(originalDoc: Document,
+                               currentDoc: Document): Boolean =
+      (firstField(originalDoc, "id"), firstField(currentDoc, "id")) match
+        case (Some(id1), Some(id2)) =>
+          val id1id2: String =
+            if id1.compareTo(id2) <= 0 then s"${id1}_${id2}" else s"${id2}_${id1}"
+
+          writtenPairs.synchronized:
+            if writtenPairs.contains(id1id2) then true
+            else
+              writtenPairs.add(id1id2)
+              false
+        case _ => false
 
     /**
      * Returns the first value associated with a field in a document.

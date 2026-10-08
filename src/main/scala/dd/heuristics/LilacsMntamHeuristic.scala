@@ -15,14 +15,14 @@ class LilacsMntamHeuristic extends Heuristics:
   override def isDuplicated(doc: Document, results: Seq[CompResult]): Boolean =
     if doc == null then false
     else
-      val titleComp: Double = score(results, "title")
-      val titleMonographicComp: Double = score(results, "title_monographic")
-      val authorComp: Double = score(results, "author")
+      val titleComp: Double = Util.similarity(results, "title")
+      val titleMonographicComp: Double = Util.similarity(results, "title_monographic")
+      val authorComp: Double = Util.similarity(results, "author")
       val authorAndPageScoresAreZero: Boolean =
         results.find(_.fieldName == "author").exists(_.similarity == 0.0) &&
           results.find(_.fieldName == "pages").exists(_.similarity == 0.0)
-      val year: (String, String) = pair(results, "publication_year")
-      val pages: (String, String) = pair(results, "pages")
+      val year: (String, String) = Util.values(results, "publication_year")
+      val pages: (String, String) = Util.values(results, "pages")
       val authorMatch: Boolean = authorComp >= 0.8
       val matchingFields: Int = Seq(
         equalAndPresent(pages._1, pages._2),
@@ -34,29 +34,5 @@ class LilacsMntamHeuristic extends Heuristics:
       else if titleComp == 1.0 then
         if titleMonographicComp == 1.0 then
           matchingFields >= 2
-        else if titleMonographicComp >= 0.8 && titleMonographicComp < 1.0 then
-          matchingFields == 3
-        else false
-      else if titleComp >= 0.8 && titleComp < 1.0 then
-        titleMonographicComp >= 0.8 && matchingFields == 3
-      else false
-
-  /**
-   * Returns a comparator similarity score or zero when absent.
-   *
-   * @param results comparison results to search
-   * @param fieldName comparator field name
-   * @return similarity score, or zero when absent
-   */
-  private def score(results: Seq[CompResult], fieldName: String): Double =
-    results.find(_.fieldName == fieldName).map(_.similarity).getOrElse(0.0)
-
-  /**
-   * Returns the original and current values for a comparator field.
-   *
-   * @param results comparison results to search
-   * @param fieldName comparator field name
-   * @return original and current values
-   */
-  private def pair(results: Seq[CompResult], fieldName: String): (String, String) =
-    results.find(_.fieldName == fieldName).map(result => (result.originalField, result.currentField)).getOrElse(("", ""))
+        else matchingFields == 3
+      else matchingFields == 3
