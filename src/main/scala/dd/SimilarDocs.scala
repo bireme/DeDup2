@@ -34,7 +34,7 @@ class SimilarDocs private[dd] (config: SimilarDocsConfig):
       SimilarDocsConfig(
         producer = new DocsProducer {
           /** Returns no source documents for the finder-only constructor. */
-          override def getDocuments: LazyList[Document] = LazyList.empty },
+          override def getDocuments: Iterator[Document] = Iterator.empty },
         finder = finder,
         comparators = filters,
         reporters = reporters.map(reporter => ConfiguredReporter(reporter, otherFields)),
@@ -63,13 +63,13 @@ class SimilarDocs private[dd] (config: SimilarDocsConfig):
 
   /** Processes the source documents with the configured worker parallelism. */
   private[dd] def processDocuments(
-      docs: LazyList[Document],
+      docs: Iterator[Document],
       recoverDocumentError: (Document, Throwable) => Try[Unit] = (_, exception) => Failure(exception),
       heuristic: Option[Heuristics] = None
   ): Try[Unit] =
     Try:
       supervised:
-        val iterator: Iterator[Document] = docs.iterator
+        val iterator: Iterator[Document] = docs
         val iteratorLock: Object = new Object
         val completed: AtomicInteger = AtomicInteger(0)
 
@@ -127,7 +127,7 @@ class SimilarDocs private[dd] (config: SimilarDocsConfig):
    * @return matched documents paired with their comparison results
    */
   private def similar(originalDoc: Document,
-                      heuristic: Option[Heuristics]): Try[LazyList[(Document, Seq[CompResult])]] =
+                      heuristic: Option[Heuristics]): Try[Iterator[(Document, Seq[CompResult])]] =
     for
       searchField <- finder.getSearchField.toRight(IllegalArgumentException("Empty search field")).toTry
       query <- originalDoc.fields.collectFirst:
@@ -137,7 +137,7 @@ class SimilarDocs private[dd] (config: SimilarDocsConfig):
         case Some(value) => finder.findDocs(searchField, query, auxQuery, value)
         case None => finder.findDocs(searchField, query, auxQuery)
     yield
-      val comparedDocuments: LazyList[(Document, Seq[CompResult])] = getResults(originalDoc, producer.getDocuments)
+      val comparedDocuments: Iterator[(Document, Seq[CompResult])] = getResults(originalDoc, producer.getDocuments)
       heuristic match
         case None => comparedDocuments
         case Some(value) => comparedDocuments.filter:
@@ -151,7 +151,7 @@ class SimilarDocs private[dd] (config: SimilarDocsConfig):
    * @return comparison results built from the provided input
    */
   private def getResults(originalDoc: Document,
-                         docs: LazyList[Document]): LazyList[(Document, Seq[CompResult])] =
+                         docs: Iterator[Document]): Iterator[(Document, Seq[CompResult])] =
     docs.map(doc => getResults(originalDoc, doc))
 
   /**

@@ -25,7 +25,7 @@ class LuceneSimDocs(luceneIndex: String,
     SimilarDocsConfig(
       producer = new DocsProducer:
         /** Returns no source documents because this wrapper receives one directly. */
-        override def getDocuments: LazyList[Document] = LazyList.empty,
+        override def getDocuments: Iterator[Document] = Iterator.empty,
       finder = new LuceneDocsFinder(luceneIndex, searchField, minSimilarity),
       comparators = filters,
       reporters = reporters.map(reporter => ConfiguredReporter(reporter, otherFields)),

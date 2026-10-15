@@ -33,8 +33,7 @@ class ExactComparator(fieldName: String,
     val currentEmpty: Boolean = cString2.isEmpty
     val similar: Boolean = oString2.equals(cString2)
     val status: SimilarityStatus =
-      if originalEmpty && currentEmpty then SimilarityStatus.yes
-      else if originalEmpty != currentEmpty then SimilarityStatus.undefined
+      if originalEmpty || currentEmpty then SimilarityStatus.undefined
       else if similar then SimilarityStatus.yes
       else SimilarityStatus.no
     val score: Int = if status == SimilarityStatus.yes then 1 else 0

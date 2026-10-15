@@ -17,8 +17,8 @@ class SimilarDocsSuite extends munit.FunSuite:
                             auxQuery: Option[String],
                             maxDocs: Int): Try[DocsProducer] =
         Success(new DocsProducer:
-          override def getDocuments: LazyList[Document] =
-            LazyList(Document(Seq("id" -> "2", "title" -> query)))
+          override def getDocuments: Iterator[Document] =
+            Iterator(Document(Seq("id" -> "2", "title" -> query)))
         )
 
       override def getSearchField: Option[String] = Some("title")
@@ -77,8 +77,8 @@ class SimilarDocsSuite extends munit.FunSuite:
                             auxQuery: Option[String],
                             maxDocs: Int): Try[DocsProducer] =
         Success(new DocsProducer:
-          override def getDocuments: LazyList[Document] =
-            LazyList(Document(Seq("id" -> "2", "title" -> "different title")))
+          override def getDocuments: Iterator[Document] =
+            Iterator(Document(Seq("id" -> "2", "title" -> "different title")))
         )
 
       override def getSearchField: Option[String] = Some("title")
@@ -149,8 +149,8 @@ class SimilarDocsSuite extends munit.FunSuite:
                             auxQuery: Option[String],
                             maxDocs: Int): Try[DocsProducer] =
         Success(new DocsProducer:
-          override def getDocuments: LazyList[Document] =
-            LazyList(Document(Seq("id" -> "2", "title" -> query)))
+          override def getDocuments: Iterator[Document] =
+            Iterator(Document(Seq("id" -> "2", "title" -> query)))
         )
 
       override def getSearchField: Option[String] = Some("title")
@@ -208,8 +208,8 @@ class SimilarDocsSuite extends munit.FunSuite:
                             maxDocs: Int): Try[DocsProducer] =
         receivedMaxDocs = Some(maxDocs)
         Success(new DocsProducer:
-          override def getDocuments: LazyList[Document] =
-            LazyList(Document(Seq("id" -> "2", "title" -> query)))
+          override def getDocuments: Iterator[Document] =
+            Iterator(Document(Seq("id" -> "2", "title" -> query)))
         )
 
       override def getSearchField: Option[String] = Some("title")
@@ -284,8 +284,8 @@ class SimilarDocsSuite extends munit.FunSuite:
                             auxQuery: Option[String],
                             maxDocs: Int): Try[DocsProducer] =
         Success(new DocsProducer:
-          override def getDocuments: LazyList[Document] =
-            LazyList(Document(Seq("id" -> "2", "title" -> query)))
+          override def getDocuments: Iterator[Document] =
+            Iterator(Document(Seq("id" -> "2", "title" -> query)))
         )
 
       override def getSearchField: Option[String] = Some("title")
@@ -350,7 +350,7 @@ class SimilarDocsSuite extends munit.FunSuite:
           Thread.sleep(delay)
           record(s"finish-$query")
           Success(new DocsProducer:
-            override def getDocuments: LazyList[Document] = LazyList.empty
+            override def getDocuments: Iterator[Document] = Iterator.empty
           )
         finally running.decrementAndGet()
 
@@ -363,8 +363,8 @@ class SimilarDocsSuite extends munit.FunSuite:
     val similarDocs = new SimilarDocs(
       SimilarDocsConfig(
         producer = new DocsProducer:
-          override def getDocuments: LazyList[Document] =
-            LazyList("1", "2", "3", "4").map(id => Document(Seq("id" -> id, "title" -> id))),
+          override def getDocuments: Iterator[Document] =
+            Iterator("1", "2", "3", "4").map(id => Document(Seq("id" -> id, "title" -> id))),
         finder = finder,
         comparators = Seq.empty,
         reporters = Seq.empty,

@@ -49,14 +49,10 @@ abstract class StringSimilarityComparator(val fieldName: String,
       if originalEmpty || currentEmpty then 0.0
       else similarity(normalizedOriginal, normalizedCurrent)
     val status: SimilarityStatus =
-      if originalEmpty && currentEmpty then SimilarityStatus.yes
-      else if originalEmpty != currentEmpty then SimilarityStatus.undefined
+      if originalEmpty || currentEmpty then SimilarityStatus.undefined
       else if comparedScore >= minSimilarity then SimilarityStatus.yes
       else SimilarityStatus.no
-    val score: Double =
-      if status == SimilarityStatus.undefined then 0.0
-      else if originalEmpty && currentEmpty then 1.0
-      else comparedScore
+    val score: Double = if status == SimilarityStatus.undefined then 0.0 else comparedScore
 
     CompResult(comparatorName, fieldName, original, current,
       Some(normalizedOriginal), Some(normalizedCurrent), score,

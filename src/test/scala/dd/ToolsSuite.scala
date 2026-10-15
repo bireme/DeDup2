@@ -43,8 +43,8 @@ class ToolsSuite extends munit.FunSuite:
   test("createLuceneIndex reports title when indexed field is empty and id is empty"):
     val indexDir = Files.createTempDirectory("dedup-empty-field-index")
     val producer = new DocsProducer:
-      override def getDocuments: LazyList[Document] =
-        LazyList(Document(Seq("id" -> "", "title" -> "Fallback title", "abstract" -> "")))
+      override def getDocuments: Iterator[Document] =
+        Iterator(Document(Seq("id" -> "", "title" -> "Fallback title", "abstract" -> "")))
     val errBytes = new ByteArrayOutputStream()
     val err = new PrintStream(errBytes)
 

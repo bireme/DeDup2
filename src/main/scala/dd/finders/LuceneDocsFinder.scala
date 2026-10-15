@@ -63,9 +63,9 @@ class LuceneDocsFinder(luceneIndex: String,
       new DocsProducer:
         /**
          * Returns the produced documents.
-         * @return lazy list of produced documents
+         * @return iterator of produced documents
          */
-        def getDocuments: LazyList[Document] = lazyList(normalizedQuery, scoreDocs)
+        def getDocuments: Iterator[Document] = lazyList(normalizedQuery, scoreDocs).iterator
 
   /** Builds the main Lucene query for a search request. */
   private def buildQuery(searchField: String,

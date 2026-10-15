@@ -37,9 +37,9 @@ class MLTDocsProducer(indexPath: String,
 
   /**
    * Returns the produced documents.
-   * @return lazy list of produced documents
+   * @return iterator of produced documents
    */
-  override def getDocuments: LazyList[Document] = getDocumentsLazy(None, curPos = 0, query, searcher)
+  override def getDocuments: Iterator[Document] = getDocumentsLazy(None, curPos = 0, query, searcher).iterator
 
   /**
    * Returns the next document identifier from the current result page.

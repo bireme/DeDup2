@@ -51,8 +51,7 @@ class UrlsComparator(fieldName: String,
         val originalEmpty = originalUrls.trim.isEmpty
         val currentEmpty = currentUrls.trim.isEmpty
         val status =
-          if originalEmpty && currentEmpty then SimilarityStatus.yes
-          else if originalEmpty != currentEmpty then SimilarityStatus.undefined
+          if originalEmpty || currentEmpty then SimilarityStatus.undefined
           else SimilarityStatus.no
         val score = if status == SimilarityStatus.yes then 1 else 0
         CompResult(name="UrlsComparator",
@@ -83,7 +82,7 @@ class UrlsComparator(fieldName: String,
       .collectFirst:
         case (`fieldName`, value) => value
       .toSeq
-      .flatMap(_.split(occSeparator))
+      .flatMap(_.split(occSeparator).filter(_.trim.nonEmpty))
       .map(toUrlElement)
 
   private def toUrlElement(value: String): UrlElement =

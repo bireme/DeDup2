@@ -49,9 +49,7 @@ class AuthorsComparator(fieldName: String,
                     status: SimilarityStatus): CompResult =
       CompResult("AuthorsComparator", fieldName, originalAuthors, currentAuthors, None, None, score, status)
 
-    if originalAuthors.trim.isEmpty && currentAuthors.trim.isEmpty then
-      buildResult(score = 1, status = SimilarityStatus.yes)
-    else if rawOriSeq.isEmpty != rawCurSeq.isEmpty then
+    if originalAuthors.trim.isEmpty || currentAuthors.trim.isEmpty then
       buildResult(score = 0, status = SimilarityStatus.undefined)
     else
       val (fromSeq, toSeq) = if oriSeq.length <= curSeq.length then (oriSeq, curSeq) else (curSeq, oriSeq)

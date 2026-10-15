@@ -60,9 +60,9 @@ class MongoDBProducer(conf: MongoDBProducerConfig) extends DocsProducer:
 
   /**
    * Returns the produced documents.
-   * @return lazy list of produced documents
+   * @return iterator of produced documents
    */
-  override def getDocuments: LazyList[Document] =
+  override def getDocuments: Iterator[Document] =
     Try:
       val collection: MongoCollection[BsonDocument] =
         mongoClient.getDatabase(conf.database).getCollection(conf.collection)
@@ -74,11 +74,11 @@ class MongoDBProducer(conf: MongoDBProducerConfig) extends DocsProducer:
 
       getDocumentsLazy(projected.iterator())
     match
-      case Success(list) => list
+      case Success(list) => list.iterator
       case Failure(exception) =>
         Console.err.println(s"MongoDBProducer/getDocuments/${exception.getMessage}")
         closeClient()
-        LazyList.empty
+        Iterator.empty
 
   /**
    * Streams MongoDB cursor entries into the internal lazy document sequence.

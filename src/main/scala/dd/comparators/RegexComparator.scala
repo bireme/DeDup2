@@ -40,8 +40,7 @@ class RegexComparator(fieldName: String,
     val currentEmpty: Boolean = cResult.isEmpty
     val similar: Boolean = oResult.equals(cResult)
     val status: SimilarityStatus =
-      if originalEmpty && currentEmpty then SimilarityStatus.yes
-      else if originalEmpty != currentEmpty then SimilarityStatus.undefined
+      if originalEmpty || currentEmpty then SimilarityStatus.undefined
       else if similar then SimilarityStatus.yes
       else SimilarityStatus.no
     val score: Int = if status == SimilarityStatus.yes then 1 else 0

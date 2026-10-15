@@ -32,9 +32,9 @@ class CSVProducer(csv: String,
                   csvFileEncoding: String = "utf-8") extends DocsProducer:
   /**
    * Returns the produced documents.
-   * @return lazy list of produced documents
+   * @return iterator of produced documents
    */
-  override def getDocuments: LazyList[Document] =
+  override def getDocuments: Iterator[Document] =
     Try:
       val formatBuilder: CSVFormat.Builder = CSVFormat.Builder.create().setDelimiter(fieldSeparator).setTrim(true)
         .setSkipHeaderRecord(hasHeader).setIgnoreEmptyLines(true)
@@ -46,10 +46,10 @@ class CSVProducer(csv: String,
 
       getDocumentsLazy(parser, schema, records)
     match
-      case Success(list) => list
+      case Success(list) => list.iterator
       case Failure(exception: Throwable) =>
         Console.err.println(s"CSVProducer/getDocuments/${exception.getMessage}")
-        LazyList.empty[Document]
+        Iterator.empty
 
   /**
    * Opens a reader from a CSV file path when the input names an existing
