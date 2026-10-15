@@ -12,7 +12,7 @@ class LuceneProducerSuite extends munit.FunSuite:
     val indexPath = Files.createTempDirectory("dedup2-lucene-producer")
     val source: DocsProducer = new DocsProducer:
       /** Returns the documents used to build the test index. */
-      override def getDocuments: LazyList[Document] = LazyList(
+      override def getDocuments: Iterator[Document] = Iterator(
         Document(Seq("id" -> "1", "title" -> "Alpha document", "extra" -> "keep out")),
         Document(Seq("id" -> "2", "title" -> "Beta document", "extra" -> "keep out"))
       )

@@ -203,10 +203,10 @@ class MysqlProducer(conf: MySqlProducerConfig) extends DocsProducer:
 
   /**
    * Returns the produced documents.
-   * @return lazy list of produced documents
+   * @return iterator of produced documents
    */
-  override def getDocuments: LazyList[Document] =
-    conf.sqlfs.to(LazyList).flatMap(documentsFromSqlFile)
+  override def getDocuments: Iterator[Document] =
+    conf.sqlfs.iterator.flatMap(documentsFromSqlFile)
 
   /**
    * Returns the produced documents for one SQL file.
@@ -214,7 +214,7 @@ class MysqlProducer(conf: MySqlProducerConfig) extends DocsProducer:
    * @param sqlFile SQL file whose query will be executed
    * @return lazy list of produced documents
    */
-  private def documentsFromSqlFile(sqlFile: String): LazyList[Document] =
+  private def documentsFromSqlFile(sqlFile: String): Iterator[Document] =
     val con: Connection = DriverManager.getConnection(url, conf.mySqlUser, conf.mySqlPassword)
     con.setReadOnly(true)
     val statement: Statement = con.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)
@@ -228,7 +228,7 @@ class MysqlProducer(conf: MySqlProducerConfig) extends DocsProducer:
     val rs: ResultSet = statement.executeQuery(content)
     println("OK")
 
-    getDocuments(rs, statement, con, Seq.empty)
+    getDocuments(rs, statement, con, Seq.empty).iterator
 
   /**
    * Returns the produced documents from the current result set.

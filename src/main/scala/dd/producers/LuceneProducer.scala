@@ -19,7 +19,7 @@ import scala.util.{Failure, Success, Try}
  * documents returned by the producer. When `fields` is defined, only stored
  * fields whose names occur in that sequence are included in each document.
  * The query is executed eagerly, while document conversion remains lazy.
- * Lucene resources are closed after the returned list is exhausted.
+ * Lucene resources are closed after the returned iterator is exhausted.
  *
  * @param indexPath path to the Lucene index
  * @param search optional Lucene query applied to indexed fields
@@ -35,21 +35,21 @@ class LuceneProducer(indexPath: String,
   private val selectedFields: Option[Set[String]] = fields.map(_.toSet)
 
   /**
-   * Returns matching stored documents as a lazy list.
+   * Returns matching stored documents as an iterator.
    *
    * @return documents selected by `search`, optionally restricted to `fields`
    */
-  override def getDocuments: LazyList[Document] =
+  override def getDocuments: Iterator[Document] =
     Try:
       val query: Query = buildQuery()
       val limit: Int = math.max(1, reader.maxDoc())
       searcher.search(query, limit).scoreDocs
     match
-      case Success(scoreDocs) => getDocumentsLazy(scoreDocs, 0)
+      case Success(scoreDocs) => getDocumentsLazy(scoreDocs, 0).iterator
       case Failure(exception) =>
         closeResources()
         Console.err.println(s"LuceneProducer/getDocuments/${exception.getMessage}")
-        LazyList.empty[Document]
+        Iterator.empty
 
   /** Builds the configured query or a query that matches every index document. */
   private def buildQuery(): Query =

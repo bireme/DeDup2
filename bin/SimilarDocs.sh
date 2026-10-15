@@ -18,6 +18,6 @@ fi
 
 cd /home/javaapps/sbt-projects/DeDup2 || exit
 
-sbt "-J-XX:+UseG1GC -J-Xmx8G runMain dd.SimilarDocs $1"
+sbt -J-XX:+UseParallelGC -J-Xmx8G "runMain dd.SimilarDocs $1"
 
 cd - || exit

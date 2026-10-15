@@ -16,7 +16,7 @@ class ConfMainLuceneProducerSuite extends munit.FunSuite:
     val reportPath = Files.createTempFile("dedup2-conf-lucene", ".pipe")
     val source: DocsProducer = new DocsProducer:
       /** Returns documents used to create the test index. */
-      override def getDocuments: LazyList[Document] = LazyList(
+      override def getDocuments: Iterator[Document] = Iterator(
         Document(Seq("id" -> "1", "title" -> "Alpha", "kind" -> "first")),
         Document(Seq("id" -> "2", "title" -> "Beta", "kind" -> "second"))
       )

@@ -28,9 +28,9 @@ class JsonProducer(input: String,
 
   /**
    * Returns the produced documents.
-   * @return lazy list of produced documents
+   * @return iterator of produced documents
    */
-  override def getDocuments: LazyList[Document] =
+  override def getDocuments: Iterator[Document] =
     Try:
       val json = Json.parse(JsonProducer.readInput(input, encoding))
       val values = json match
@@ -40,10 +40,10 @@ class JsonProducer(input: String,
 
       getDocumentsLazy(values)
     match
-      case Success(list) => list
+      case Success(list) => list.iterator
       case Failure(exception) =>
         Console.err.println(s"JsonProducer/getDocuments/${exception.getMessage}")
-        LazyList.empty[Document]
+        Iterator.empty
 
   /**
    * Builds the lazy list of produced documents.

@@ -266,7 +266,7 @@ object SelfCheckDuplicated:
       SimilarDocsConfig(
         producer = new DocsProducer:
           /** Returns no source documents because self-check reads the index. */
-          override def getDocuments: LazyList[Document] = LazyList.empty,
+          override def getDocuments: Iterator[Document] = Iterator.empty,
         finder = LuceneDocsFinder(index, config.searchField, config.minSimilarity),
         comparators = config.comparators,
         reporters = config.reporters.map:

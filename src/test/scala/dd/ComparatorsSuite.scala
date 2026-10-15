@@ -1,6 +1,6 @@
 package dd
 
-import dd.comparators.{AuthorsComparator, DiceComparator, ExactComparator, NGramComparator, RegexComparator, UrlsComparator}
+import dd.comparators.{AuthorsComparator, DiceComparator, ExactComparator, JaccardComparator, LevenshteinComparator, LevenshteinJaccardComparator, NGramComparator, RegexComparator, UrlsComparator}
 import dd.interfaces.{Document, SimilarityStatus}
 
 class ComparatorsSuite extends munit.FunSuite:
@@ -64,9 +64,9 @@ class ComparatorsSuite extends munit.FunSuite:
     assertEquals(result.originalFieldOther, Some(decodedUrl))
     assertEquals(result.currentFieldOther, Some(decodedUrl))
 
-  test("comparators consider two empty fields similar"):
-    val left = Document(Seq.empty)
-    val right = Document(Seq.empty)
+  test("comparators mark two empty fields as undefined with zero similarity"):
+    val left = Document(Seq("missing" -> "", "authors" -> "", "link" -> ""))
+    val right = Document(Seq("missing" -> "", "authors" -> "", "link" -> ""))
     val comparators = Seq(
       new ExactComparator("missing", normalize = false),
       new ExactComparator("missing", normalize = true),
@@ -76,13 +76,17 @@ class ComparatorsSuite extends munit.FunSuite:
       new NGramComparator("missing", normalize = true, minSimilarity = 0.0),
       new RegexComparator("missing", normalize = false, regex = "\\d+", compString = "$0"),
       new RegexComparator("missing", normalize = true, regex = "\\d+", compString = "$0"),
-      new AuthorsComparator("missing")
+      new LevenshteinComparator("missing", normalize = false, minSimilarity = 0.0),
+      new JaccardComparator("missing", normalize = false, minSimilarity = 0.0),
+      new LevenshteinJaccardComparator("missing", normalize = false, minSimilarity = 0.0),
+      new AuthorsComparator("authors"),
+      new UrlsComparator("link")
     )
 
     val results = comparators.map(_.compare(left, right))
 
-    assert(results.forall(_.isSimilar == SimilarityStatus.yes))
-    assertEquals(results.map(_.similarity), Seq.fill(comparators.size)(1.0))
+    assert(results.forall(_.isSimilar == SimilarityStatus.undefined))
+    assertEquals(results.map(_.similarity), Seq.fill(comparators.size)(0.0))
 
   test("comparators mark one empty field as undefined with zero similarity"):
     val left = Document(Seq("title" -> "present", "authors" -> "Silva, Joao"))

@@ -36,12 +36,10 @@ class DiceComparator(val fieldName: String,
     val originalEmpty: Boolean = oString2.isEmpty
     val currentEmpty: Boolean = cString2.isEmpty
     val score: Double =
-      if originalEmpty != currentEmpty then 0.0
-      else if originalEmpty && currentEmpty then 1.0
+      if originalEmpty || currentEmpty then 0.0
       else DiceCoefficient.score(oString2, cString2)
     val status: SimilarityStatus =
-      if originalEmpty && currentEmpty then SimilarityStatus.yes
-      else if originalEmpty != currentEmpty then SimilarityStatus.undefined
+      if originalEmpty || currentEmpty then SimilarityStatus.undefined
       else if score >= minSimilarity then SimilarityStatus.yes
       else SimilarityStatus.no
     
