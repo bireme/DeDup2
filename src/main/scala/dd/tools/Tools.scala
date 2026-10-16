@@ -12,6 +12,7 @@ import java.io.File
 import java.nio.file.Path
 import java.text.Normalizer
 import java.text.Normalizer.Form
+import java.util.regex.Pattern
 import scala.jdk.CollectionConverters.IteratorHasAsScala
 import scala.util.{Failure, Success, Try}
 
@@ -45,14 +46,20 @@ object Tools:
           if split.length == 1 then map + (split(0).substring(2) -> "")
           else map + (split(0).substring(1) -> split(1))
 
+  // Patterns compiled once: the normalizers run for every compared document pair.
+  private val NonAlphanumeric: Pattern = Pattern.compile("[^a-z0-9]")
+  private val Marks: Pattern = Pattern.compile("\\p{M}")
+  private val NonAlphanumericOrSpace: Pattern = Pattern.compile("[^a-z0-9\\s]")
+  private val Spaces: Pattern = Pattern.compile("\\s+")
+
   /**
    * Normalizes a string for comparison.
    *
    * @param in input string to normalize
    * @return normalized string value
    */
-  def normalizeStr(in: String): String = Normalizer.normalize(in.trim().toLowerCase, Form.NFD)
-    .replaceAll("[^a-z0-9]", "")
+  def normalizeStr(in: String): String =
+    NonAlphanumeric.matcher(Normalizer.normalize(in.trim().toLowerCase, Form.NFD)).replaceAll("")
 
   /**
    * Normalizes text while preserving word boundaries for word-based comparisons.
@@ -61,11 +68,9 @@ object Tools:
    * @return lowercase ASCII text with single spaces between words
    */
   def normalizeWordsStr(in: String): String =
-    Normalizer.normalize(in.toLowerCase, Form.NFD)
-      .replaceAll("\\p{M}", "")
-      .replaceAll("[^a-z0-9\\s]", " ")
-      .replaceAll("\\s+", " ")
-      .trim
+    val withoutMarks: String = Marks.matcher(Normalizer.normalize(in.toLowerCase, Form.NFD)).replaceAll("")
+    val onlyWords: String = NonAlphanumericOrSpace.matcher(withoutMarks).replaceAll(" ")
+    Spaces.matcher(onlyWords).replaceAll(" ").trim
 
   /**
    * Parses a comma-separated SQL file list.
