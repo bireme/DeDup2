@@ -1,7 +1,8 @@
 package dd.comparators
 
-import dd.interfaces.{CompResult, Comparator, Document, SimilarityStatus}
+import dd.interfaces.{CompResult, Comparator, Document, PreparedComparator, SimilarityStatus}
 import dd.tools.StringSimilarity.DiceCoefficient
+import dd.tools.StringSimilarity.DiceCoefficient.Bigrams
 import org.apache.commons.csv.CSVFormat
 
 import java.io.StringReader
@@ -24,6 +25,38 @@ class AuthorsComparator(fieldName: String,
   private val shortNameSimilarityThreshold: Double = 0.4
   private val generalSimilarityThreshold: Double = 0.5
 
+  // Patterns and CSV format built once: authors are extracted for every compared document.
+  private val occSeparatorPattern: Pattern = Pattern.compile(Pattern.quote(occSeparator))
+  private lazy val spacedOccSeparatorPattern: Pattern = Pattern.compile(s" *$occSeparator *")
+  private val semicolonFormat: CSVFormat = CSVFormat.Builder.create().setDelimiter(';').setTrim(true).get()
+
+  /**
+   * Normalized author name with the values reused by every comparison.
+   *
+   * @param name normalized author name
+   * @param bigrams precomputed Dice bigrams of {@code name}
+   * @param isShortName whether the name has exactly two space-separated words
+   */
+  private case class Author(name: String, bigrams: Bigrams, isShortName: Boolean)
+
+  /**
+   * Authors of one document.
+   *
+   * @param joined raw author names joined by the occurrence separator
+   * @param authors normalized authors
+   */
+  private case class Authors(joined: String, authors: Seq[Author])
+
+  /**
+   * Prepares the comparator for a source document, extracting its authors once.
+   *
+   * @param originalDoc source document used in every subsequent comparison
+   * @return comparator bound to the source document
+   */
+  override def prepare(originalDoc: Document): PreparedComparator =
+    val original: Authors = documentAuthors(originalDoc)
+    currentDoc => compareAuthors(original, documentAuthors(currentDoc))
+
   /**
    * Compares the input documents and returns the comparison result.
    *
@@ -33,11 +66,17 @@ class AuthorsComparator(fieldName: String,
    */
   override def compare(originalDoc: Document,
                        currentDoc: Document): CompResult =
-    val (rawOriSeq, oriSeq) = getAuthors(fieldName, originalDoc)
-    val (rawCurSeq, curSeq) = getAuthors(fieldName, currentDoc)
-    val originalAuthors: String = rawOriSeq.mkString(occSeparator)
-    val currentAuthors: String = rawCurSeq.mkString(occSeparator)
+    prepare(originalDoc).compare(currentDoc)
 
+  /**
+   * Compares the authors of two documents.
+   *
+   * @param original authors of the source document
+   * @param current authors of the candidate document
+   * @return comparison result describing the evaluated documents
+   */
+  private def compareAuthors(original: Authors,
+                             current: Authors): CompResult =
     /**
      * Builds a comparison result for the current author sets.
      *
@@ -47,11 +86,13 @@ class AuthorsComparator(fieldName: String,
      */
     def buildResult(score: Int,
                     status: SimilarityStatus): CompResult =
-      CompResult("AuthorsComparator", fieldName, originalAuthors, currentAuthors, None, None, score, status)
+      CompResult("AuthorsComparator", fieldName, original.joined, current.joined, None, None, score, status)
 
-    if originalAuthors.trim.isEmpty || currentAuthors.trim.isEmpty then
+    if original.joined.trim.isEmpty || current.joined.trim.isEmpty then
       buildResult(score = 0, status = SimilarityStatus.undefined)
     else
+      val oriSeq: Seq[Author] = original.authors
+      val curSeq: Seq[Author] = current.authors
       val (fromSeq, toSeq) = if oriSeq.length <= curSeq.length then (oriSeq, curSeq) else (curSeq, oriSeq)
 
       if fromSeq.length < toSeq.length * 0.8 then
@@ -60,6 +101,25 @@ class AuthorsComparator(fieldName: String,
         val isSimilar: Boolean = fromSeq.forall(existSimilar(_, toSeq))
         val status = if isSimilar then SimilarityStatus.yes else SimilarityStatus.no
         buildResult(score = if isSimilar then 1 else 0, status = status)
+
+  /**
+   * Extracts the raw and normalized authors of a document.
+   *
+   * @param document document that provides the input values
+   * @return authors of the document
+   */
+  private def documentAuthors(document: Document): Authors =
+    val (rawAuthors, normalizedAuthors) = getAuthors(fieldName, document)
+    Authors(rawAuthors.mkString(occSeparator), normalizedAuthors.map(toAuthor))
+
+  /**
+   * Precomputes the comparison values of a normalized author name.
+   *
+   * @param name normalized author name
+   * @return author with its precomputed values
+   */
+  private def toAuthor(name: String): Author =
+    Author(name, DiceCoefficient.bigrams(name), name.split(" ").length == 2)
 
   /**
    * Extracts and normalizes the authors stored in the selected field.
@@ -77,7 +137,7 @@ class AuthorsComparator(fieldName: String,
 
     val rawAuthors: Seq[String] =
       if fixOccSeparator then originalAuthors.flatMap(author => getAuthors(author, occSeparator))
-      else originalAuthors.flatMap(_.split(s" *$occSeparator *"))
+      else originalAuthors.flatMap(spacedOccSeparatorPattern.split(_).toSeq)
 
     val normalizedAuthors: Seq[String] = rawAuthors.map(normalizeAuthorName)
 
@@ -87,7 +147,7 @@ class AuthorsComparator(fieldName: String,
   private def getAuthors(field: String,
                          authorSeparator: String): Seq[String] =
     if field.isEmpty then Seq[String]()
-    else if field.contains(authorSeparator) then field.split(Pattern.quote(authorSeparator)).toSeq // line already processed
+    else if field.contains(authorSeparator) then occSeparatorPattern.split(field).toSeq // line already processed
     else if field.contains(";") then separateBySemicolon(field)
     else Seq(field.trim)
 
@@ -98,8 +158,7 @@ class AuthorsComparator(fieldName: String,
    * @return non-empty author values
    */
   private def separateBySemicolon(field: String): Seq[String] =
-    CSVFormat.Builder.create().setDelimiter(';').setTrim(true).get().
-      parse(new StringReader(field)).asScala.head.asScala.toSeq.map(_.trim)
+    semicolonFormat.parse(new StringReader(field)).asScala.head.asScala.toSeq.map(_.trim)
 
   /**
    * Normalizes an author name for comparison.
@@ -108,12 +167,12 @@ class AuthorsComparator(fieldName: String,
    * @return normalized author value
    */
   private def normalizeAuthorName(author: String): String =
-    val trimmedName: String = author.replaceAll(" {2,}", " ").trim
-    val invertedName: Array[String] = trimmedName.split(" *, *", 2)
+    val trimmedName: String = AuthorsComparator.RepeatedSpaces.matcher(author).replaceAll(" ").trim
+    val invertedName: Array[String] = AuthorsComparator.Comma.split(trimmedName, 2)
     val orderedName: String = (if invertedName.length == 2 then invertedName.reverse else invertedName).mkString(" ")
 
-    Normalizer.normalize(orderedName.toLowerCase(), Form.NFD)
-      .replaceAll("[\\p{InCombiningDiacriticalMarks}]", "")
+    AuthorsComparator.Diacritics.matcher(Normalizer.normalize(orderedName.toLowerCase(), Form.NFD))
+      .replaceAll("")
       .replace(".", "")
 
   /**
@@ -123,8 +182,8 @@ class AuthorsComparator(fieldName: String,
    * @param others candidate values checked against the input author
    * @return true when an equivalent author is found, false otherwise
    */
-  private def existSimilar(author: String,
-                           others: Seq[String]): Boolean =
+  private def existSimilar(author: Author,
+                           others: Seq[Author]): Boolean =
     others.exists(isSimilar(_, author))
 
   /**
@@ -134,27 +193,29 @@ class AuthorsComparator(fieldName: String,
    * @param author2 second author value to compare
    * @return true when the provided values are considered similar, false otherwise
    */
-  private def isSimilar(author1: String,
-                        author2: String): Boolean =
+  private def isSimilar(author1: Author,
+                        author2: Author): Boolean =
     val similarity: Double = getSimilarity(author1, author2)
-    val hasCompatibleInitial: Boolean = author1.nonEmpty && author2.nonEmpty && author1.head == author2.head
-    val bothAreShortNames: Boolean = author1.split(" ").length == 2 && author2.split(" ").length == 2
+    val name1: String = author1.name
+    val name2: String = author2.name
+    val hasCompatibleInitial: Boolean = name1.nonEmpty && name2.nonEmpty && name1.head == name2.head
+    val bothAreShortNames: Boolean = author1.isShortName && author2.isShortName
 
-    (author1.isEmpty && author2.isEmpty) ||
+    (name1.isEmpty && name2.isEmpty) ||
       (hasCompatibleInitial && bothAreShortNames && similarity >= shortNameSimilarityThreshold) ||
       similarity >= generalSimilarityThreshold
 
   /**
    * Returns the similarity score for the provided values.
    *
-   * @param str1 first value to compare
-   * @param str2 second value to compare
+   * @param author1 first value to compare
+   * @param author2 second value to compare
    * @return similarity score for the provided values
    */
-  private def getSimilarity(str1: String,
-                            str2: String): Double =
-    if str1.isEmpty != str2.isEmpty then 0
-    else DiceCoefficient.score(str1, str2)
+  private def getSimilarity(author1: Author,
+                            author2: Author): Double =
+    if author1.name.isEmpty != author2.name.isEmpty then 0
+    else DiceCoefficient.score(author1.bigrams, author2.bigrams)
 
 /**
  * Command-line utility that evaluates author-list similarity line by line.
@@ -164,6 +225,10 @@ class AuthorsComparator(fieldName: String,
  * the comparator implementation.
  */
 object AuthorsComparator:
+  private val RepeatedSpaces: Pattern = Pattern.compile(" {2,}")
+  private val Comma: Pattern = Pattern.compile(" *, *")
+  private val Diacritics: Pattern = Pattern.compile("[\\p{InCombiningDiacriticalMarks}]")
+
   /**
    * Prints the command usage information and exits.
    * @return no value; this method terminates the application

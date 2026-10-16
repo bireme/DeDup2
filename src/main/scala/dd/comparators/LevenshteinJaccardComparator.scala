@@ -7,7 +7,7 @@ import dd.tools.Tools
 class LevenshteinJaccardComparator(fieldName: String,
                                    normalize: Boolean,
                                    minSimilarity: Double)
-    extends StringSimilarityComparator(fieldName, normalize, minSimilarity):
+    extends StringSimilarityComparator[String](fieldName, normalize, minSimilarity):
   protected val comparatorName: String = "LevenshteinJaccardComparator"
 
   /**
@@ -18,6 +18,14 @@ class LevenshteinJaccardComparator(fieldName: String,
    */
   override protected def normalizeValue(value: String): String =
     if normalize then Tools.normalizeWordsStr(value) else value
+
+  /**
+   * Uses the normalized value itself as the preprocessed representation.
+   *
+   * @param value normalized field value
+   * @return the same value
+   */
+  protected def preprocess(value: String): String = value
 
   /**
    * Calculates the weighted combined similarity for two prepared values.

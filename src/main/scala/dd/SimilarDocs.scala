@@ -3,7 +3,7 @@ package dd
 import dd.comparators.DiceComparator
 import dd.configurators.ConfMain
 import dd.configurators.ConfMain.{ConfiguredReporter, SimilarDocsConfig}
-import dd.interfaces.{CompResult, Comparator, DocsFinder, DocsProducer, Document, Heuristics, Reporter}
+import dd.interfaces.{CompResult, Comparator, DocsFinder, DocsProducer, Document, Heuristics, PreparedComparator, Reporter}
 import ox.{Fork, forkUser, par, supervised}
 
 import java.io.File
@@ -152,18 +152,20 @@ class SimilarDocs private[dd] (config: SimilarDocsConfig):
    */
   private def getResults(originalDoc: Document,
                          docs: Iterator[Document]): Iterator[(Document, Seq[CompResult])] =
-    docs.map(doc => getResults(originalDoc, doc))
+    // The source document is processed once and reused for every candidate.
+    val prepared: Seq[PreparedComparator] = filters.map(_.prepare(originalDoc))
+    docs.map(doc => getResults(prepared, doc))
 
   /**
    * Builds the comparison results for the provided documents.
    *
-   * @param originalDoc source document used in the comparison
+   * @param prepared comparators bound to the source document
    * @param currentDoc candidate document being evaluated
    * @return comparison results built from the provided input
    */
-  private def getResults(originalDoc: Document,
+  private def getResults(prepared: Seq[PreparedComparator],
                          currentDoc: Document): (Document, Seq[CompResult]) =
-    val results: Seq[CompResult] = par(filters.map(comparator => () => comparator.compare(originalDoc, currentDoc)))
+    val results: Seq[CompResult] = par(prepared.map(comparator => () => comparator.compare(currentDoc)))
     (currentDoc, results)
 
   /**

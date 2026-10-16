@@ -6,8 +6,16 @@ import dd.tools.StringSimilarity.Levenshtein
 class LevenshteinComparator(fieldName: String,
                             normalize: Boolean,
                             minSimilarity: Double)
-    extends StringSimilarityComparator(fieldName, normalize, minSimilarity):
+    extends StringSimilarityComparator[String](fieldName, normalize, minSimilarity):
   protected val comparatorName: String = "LevenshteinComparator"
+
+  /**
+   * Uses the normalized value itself as the preprocessed representation.
+   *
+   * @param value normalized field value
+   * @return the same value
+   */
+  protected def preprocess(value: String): String = value
 
   /**
    * Calculates normalized Levenshtein similarity for two prepared values.
