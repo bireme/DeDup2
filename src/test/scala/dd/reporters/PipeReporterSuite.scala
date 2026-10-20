@@ -34,10 +34,10 @@ class PipeReporterSuite extends munit.FunSuite:
     assertEquals(
       writer.toString,
       "id_1|id_2|Comparator|Field|originalField|currentField|originalFieldOther|currentFieldOther|Similarity|isSimilar\n" +
-        "1|2|NGramComparator|title|same title|same title|null|null|1.0|yes"
+        "1|2|NGramComparator|title|same title|same title|||1.0|yes"
     )
 
-  test("writeResults replaces empty fields with null"):
+  test("writeResults preserves empty fields"):
     val writer = new StringWriter()
     val reporter = new PipeReporter(writer, "\n", putHeader = false, minTrue = 0)
     val originalDoc = Document(Seq("id" -> "", "title" -> ""))
@@ -58,7 +58,7 @@ class PipeReporterSuite extends munit.FunSuite:
     assert(written.isSuccess)
     assertEquals(
       writer.toString,
-      "null|2|NGramComparator|title|null|null|null|null|1.0|yes"
+      "\"\"|2|NGramComparator|title|||||1.0|yes"
     )
 
   test("writeResults exports original and other comparison fields separately"):
@@ -110,7 +110,7 @@ class PipeReporterSuite extends munit.FunSuite:
     assertEquals(
       writer.toString,
       "id_1|id_2|missing_1|missing_2|Comparator|Field|originalField|currentField|originalFieldOther|currentFieldOther|Similarity|isSimilar\n" +
-        "1|null|null|null|NGramComparator|title|same title|same title|null|null|1.0|yes"
+        "1||||NGramComparator|title|same title|same title|||1.0|yes"
     )
 
   test("writeResults flushes immediately when flushResults is enabled"):

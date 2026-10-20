@@ -30,24 +30,18 @@ class LilacsSasHeuristicWeak extends Heuristics:
   override def isDuplicated(doc: Document, results: Seq[CompResult]): Boolean =
     if doc == null then false
     else
-      val titleSim: Double = similarity(results, titleField)
-      val volume: (String, String) = Util.values(results, volumeField)
-      val issue: (String, String) = Util.values(results, issueField)
-      val author: (String, String) = Util.values(results, authorField)
-      val pages: (String, String) = Util.values(results, pageField)
-
       isSimilar(results, journalField) &&
-        (if (titleSim == 1.0) then
+        (if similarity(results, titleField) == 1.0 then
           Seq(
-            equalOrAbsent(volume._1, volume._2),
-            equalOrAbsent(issue._1, issue._2),
-            equalOrAbsent(author._1, author._2),
-            equalOrAbsent(pages._1, pages._2)
+            isSimilarOrUndefined(results, volumeField),
+            isSimilarOrUndefined(results, issueField),
+            isSimilarOrUndefined(results, authorField),
+            isSimilarOrUndefined(results, pageField)
           ).forall(identity)
         else
           Seq(
-            equalAndPresent(volume._1, volume._2),
-            equalAndPresent(issue._1, issue._2),
-            equalAndPresent(author._1, author._2),
-            equalAndPresent(pages._1, pages._2)
+            isSimilar(results, volumeField),
+            isSimilar(results, issueField),
+            isSimilar(results, authorField),
+            isSimilar(results, pageField)
           ).forall(identity))

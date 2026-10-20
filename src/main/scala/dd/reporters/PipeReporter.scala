@@ -161,7 +161,7 @@ class PipeReporter(writer: Writer,
                            otherFields: Seq[String],
                            results: Seq[CompResult]): Seq[String] =
     val otherFieldValues = getOtherFields(originalDoc, currentDoc, otherFields)
-    (otherFieldValues ++ results.flatMap(getResultFields)).map(nullIfEmpty)
+    otherFieldValues ++ results.flatMap(getResultFields)
 
   /**
    * Returns the serialized values of a comparison result.
@@ -176,12 +176,3 @@ class PipeReporter(writer: Writer,
       result.originalFieldOther.getOrElse(""),
       result.currentFieldOther.getOrElse(""),
       result.similarity.toString, ReporterSimilarityStatus.displayValue(result))
-
-  /**
-   * Converts empty output cells to the textual null marker.
-   *
-   * @param value serialized cell value
-   * @return original value or "null" when empty
-   */
-  private def nullIfEmpty(value: String): String =
-    if value.isEmpty then "null" else value

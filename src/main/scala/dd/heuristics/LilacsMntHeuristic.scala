@@ -17,14 +17,9 @@ class LilacsMntHeuristic extends Heuristics:
   override def isDuplicated(doc: Document, results: Seq[CompResult]): Boolean =
     if doc == null then false
     else
-      val volume: (String, String) = Util.values(results, "volume_serial")
-      val issue: (String, String) = Util.values(results, "issue_number")
-      val author: (String, String) = Util.values(results, "author")
-      val pages: (String, String) = Util.values(results, "pages_monographic")
-
       Seq(
-        equalAndPresent(volume._1, volume._2),
-        equalAndPresent(issue._1, issue._2),
-        equalAndPresent(author._1, author._2),
-        equalAndPresent(pages._1, pages._2)
+        isSimilar(results, "volume_serial"),
+        isSimilar(results, "issue_number"),
+        isSimilar(results, "author"),
+        isSimilar(results, "pages_monographic")
       ).forall(identity)

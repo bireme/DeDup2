@@ -119,7 +119,7 @@ private[reporters] object LuceneReporter:
 
     (baseFields ++ results.flatMap(resultFields)).map:
       case (fieldName, value) =>
-        fieldNameMapping.getOrElse(fieldName, fieldName) -> nullIfEmpty(value)
+        fieldNameMapping.getOrElse(fieldName, fieldName) -> value
 
   /**
    * Returns all values for a requested field as a single stored value.
@@ -149,12 +149,3 @@ private[reporters] object LuceneReporter:
       "Similarity" -> result.similarity.toString,
       "isSimilar" -> ReporterSimilarityStatus.displayValue(result)
     )
-
-  /**
-   * Converts empty output cells to the textual null marker.
-   *
-   * @param value serialized field value
-   * @return original value or "null" when empty
-   */
-  private def nullIfEmpty(value: String): String =
-    if value.isEmpty then "null" else value

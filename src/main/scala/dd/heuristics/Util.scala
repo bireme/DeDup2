@@ -39,6 +39,28 @@ object Util:
       .exists(_.isSimilar == SimilarityStatus.yes)
 
   /**
+   * Returns whether the comparator marked the specified field as undefined.
+   *
+   * @param results comparator results to search
+   * @param fieldName comparator field name
+   * @return {@code true} only when the field result is {@code undefined}
+   */
+  def isUndefined(results: Seq[CompResult], fieldName: String): Boolean =
+    results.find(_.fieldName == fieldName)
+      .exists(_.isSimilar == SimilarityStatus.undefined)
+
+  /**
+   * Returns whether the comparator marked the specified field as similar or undefined.
+   *
+   * @param results comparator results to search
+   * @param fieldName comparator field name
+   * @return {@code true} when the field status is {@code yes} or {@code undefined}
+   */
+  def isSimilarOrUndefined(results: Seq[CompResult], fieldName: String): Boolean =
+    results.find(_.fieldName == fieldName)
+      .exists(result => result.isSimilar == SimilarityStatus.yes || result.isSimilar == SimilarityStatus.undefined)
+
+  /**
    * Parses a textual similarity value.
    *
    * @param value textual similarity value

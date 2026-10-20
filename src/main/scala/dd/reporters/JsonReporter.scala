@@ -156,7 +156,7 @@ class JsonReporter(writer: Writer,
      * @return JSON value containing the field occurrences
      */
     def collectField(doc: Document, oField: String): JsValue =
-      nullIfEmpty(doc.fields.filter(_._1.equals(oField)).map(_._2).mkString("|"))
+      JsString(doc.fields.filter(_._1.equals(oField)).map(_._2).mkString("|"))
 
     otherFields.map:
       oField =>
@@ -175,8 +175,8 @@ class JsonReporter(writer: Writer,
     Json.obj(
       "comparator" -> result.name,
       "field" -> result.fieldName,
-      "originalField" -> nullIfEmpty(result.originalField),
-      "currentField" -> nullIfEmpty(result.currentField),
+      "originalField" -> JsString(result.originalField),
+      "currentField" -> JsString(result.currentField),
       "originalFieldOther" -> result.originalFieldOther.filter(_.nonEmpty).map(JsString.apply).getOrElse(JsNull),
       "currentFieldOther" -> result.currentFieldOther.filter(_.nonEmpty).map(JsString.apply).getOrElse(JsNull),
       "similarity" -> JsNumber(BigDecimal(result.similarity)),
@@ -191,12 +191,3 @@ class JsonReporter(writer: Writer,
    */
   private def similarityValue(result: CompResult): JsValue =
     JsString(ReporterSimilarityStatus.displayValue(result))
-
-  /**
-   * Converts empty output values to JSON null.
-   *
-   * @param value serialized field value
-   * @return JSON string value or null when empty
-   */
-  private def nullIfEmpty(value: String): JsValue =
-    if value.isEmpty then JsNull else JsString(value)

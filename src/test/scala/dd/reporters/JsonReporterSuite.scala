@@ -42,7 +42,7 @@ class JsonReporterSuite extends munit.FunSuite:
     assertEquals((json \ 0 \ "results" \ 0 \ "similarity").as[Double], 1.0)
     assertEquals((json \ 0 \ "results" \ 0 \ "isSimilar").as[String], "yes")
 
-  test("writeResults serializes empty values as JSON null"):
+  test("writeResults preserves empty values as empty JSON strings"):
     val writer = new StringWriter()
     val reporter = new JsonReporter(writer, minTrue = 0)
     val originalDoc = Document(Seq("id" -> "", "title" -> ""))
@@ -63,9 +63,9 @@ class JsonReporterSuite extends munit.FunSuite:
     val json = Json.parse(writer.toString)
 
     assert(written.isSuccess)
-    assertEquals((json \ 0 \ "fields" \ "id" \ "original").get, JsNull)
+    assertEquals((json \ 0 \ "fields" \ "id" \ "original").as[String], "")
     assertEquals((json \ 0 \ "fields" \ "id" \ "current").as[String], "2")
-    assertEquals((json \ 0 \ "results" \ 0 \ "originalField").get, JsNull)
+    assertEquals((json \ 0 \ "results" \ 0 \ "originalField").as[String], "")
     assertEquals((json \ 0 \ "results" \ 0 \ "currentFieldOther").get, JsNull)
     assertEquals((json \ 0 \ "results" \ 0 \ "similarity").as[Double], 1.0)
     assertEquals((json \ 0 \ "results" \ 0 \ "isSimilar").as[String], "yes")
