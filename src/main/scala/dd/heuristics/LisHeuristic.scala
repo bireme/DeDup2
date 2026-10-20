@@ -15,5 +15,5 @@ class LisHeuristic extends Heuristics:
   override def isDuplicated(doc: Document, results: Seq[CompResult]): Boolean =
     if doc == null then false
     else
-      val urls: (String, String) = Util.values(results, "link")
+      val urls: (String, String) = values(results, "link")
       equalAndPresent(urls._1, urls._2)
