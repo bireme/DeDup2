@@ -51,6 +51,10 @@ object Tools:
   private val Marks: Pattern = Pattern.compile("\\p{M}")
   private val NonAlphanumericOrSpace: Pattern = Pattern.compile("[^a-z0-9\\s]")
   private val Spaces: Pattern = Pattern.compile("\\s+")
+  private val RomanNumeral: Pattern = Pattern.compile(
+    "^(M{0,3})(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$",
+    Pattern.CASE_INSENSITIVE
+  )
 
   /**
    * Normalizes a string for comparison.
@@ -71,6 +75,33 @@ object Tools:
     val withoutMarks: String = Marks.matcher(Normalizer.normalize(in.toLowerCase, Form.NFD)).replaceAll("")
     val onlyWords: String = NonAlphanumericOrSpace.matcher(withoutMarks).replaceAll(" ")
     Spaces.matcher(onlyWords).replaceAll(" ").trim
+
+  /**
+   * Converts a canonical Roman numeral to its Hindu-Arabic integer value.
+   *
+   * The accepted range is 1 through 3999. Input is trimmed and compared
+   * case-insensitively; malformed numerals return {@code None}.
+   *
+   * @param string possible Roman numeral
+   * @return converted integer, or {@code None} if the input is not a valid numeral
+   */
+  def roman2Indu(string: String): Option[Int] =
+    Option(string).map(_.trim.toUpperCase(java.util.Locale.ROOT)).filter(value =>
+      value.nonEmpty && RomanNumeral.matcher(value).matches()
+    ).map: value =>
+      val values: Map[Char, Int] = Map(
+        'I' -> 1,
+        'V' -> 5,
+        'X' -> 10,
+        'L' -> 50,
+        'C' -> 100,
+        'D' -> 500,
+        'M' -> 1000
+      )
+      value.indices.map: index =>
+        val current: Int = values(value(index))
+        if index + 1 < value.length && current < values(value(index + 1)) then -current else current
+      .sum
 
   /**
    * Parses a comma-separated SQL file list.

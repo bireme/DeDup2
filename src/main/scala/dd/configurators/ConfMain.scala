@@ -1,6 +1,6 @@
 package dd.configurators
 
-import dd.comparators.{AuthorsComparator, DiceComparator, ExactComparator, JaccardComparator, LevenshteinComparator, LevenshteinJaccardComparator, NGramComparator, RegexComparator, UrlsComparator}
+import dd.comparators.{AuthorsComparator, DiceComparator, ExactComparator, JaccardComparator, LevenshteinComparator, LevenshteinJaccardComparator, NGramComparator, NumberComparator, RegexComparator, UrlsComparator}
 import dd.finders.LuceneDocsFinder
 import dd.heuristics.{DirevHeuristic, LilacsMntHeuristic, LilacsMntamHeuristic, LilacsSasHeuristic, LilacsSasHeuristicWeak, LilacsSasSourceHeuristic, LisHeuristic}
 import dd.interfaces.{Comparator, DocsFinder, DocsProducer, Heuristics, Reporter}
@@ -585,6 +585,7 @@ object ConfMain:
     else if map.contains("levenshteinJaccard") then parseLevenshteinJaccardComparator(map("levenshteinJaccard").as[JsObject])
     else if map.contains("ngram") then parseNGramComparator(map("ngram").as[JsObject])
     else if map.contains("regex") then parseRegexComparator(map("regex").as[JsObject])
+    else if map.contains("number") then parseNumberComparator(map("number").as[JsObject])
     else if map.contains("authors") then parseAuthorsComparator(map("authors").as[JsObject])
     else if map.contains("urls") then parseUrlsComparator(map("urls").as[JsObject])
     else throw new IllegalArgumentException(s"Invalid comparator: $jsonStr")
@@ -690,6 +691,19 @@ object ConfMain:
     val map: collection.Map[String, JsValue] = json.value
     new RegexComparator(requiredString(map, "fieldName"), requiredBoolean(map, "normalize"),
       requiredString(map, "regex"), requiredString(map, "compString", allowEmpty = true))
+
+  /**
+   * Parses the number comparator configuration.
+   *
+   * @param json JSON object containing the selected configuration block
+   * @return configured number comparator
+   */
+  private def parseNumberComparator(json: JsObject): NumberComparator =
+    val map: collection.Map[String, JsValue] = json.value
+    new NumberComparator(
+      fieldName = requiredString(map, "fieldName"),
+      regex = optionalString(map, "regex").getOrElse("\\d+")
+    )
 
   /**
    * Parses the authors comparator configuration.

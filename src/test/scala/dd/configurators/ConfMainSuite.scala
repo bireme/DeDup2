@@ -130,6 +130,31 @@ class ConfMainSuite extends munit.FunSuite:
     assertEquals(result.isSimilar, SimilarityStatus.yes)
     assertEquals(result.similarity, 1.0)
 
+  test("parseSimilarityConfig accepts number comparator"):
+    val config =
+      """{
+        |  "finder": {
+        |    "lucene": {
+        |      "searchField": "title",
+        |      "minSimilarity": 0.8
+        |    }
+        |  },
+        |  "comparators": [
+        |    { "number": { "fieldName": "volume", "regex": "\\d+" } }
+        |  ]
+        |}""".stripMargin
+
+    val (_, comparators) = ConfMain.parseSimilarityConfig(config)
+    val result = comparators.head.compare(
+      Document(Seq("volume" -> "IX")),
+      Document(Seq("volume" -> "9"))
+    )
+
+    assertEquals(comparators.size, 1)
+    assertEquals(result.name, "NumberComparator")
+    assertEquals(result.isSimilar, SimilarityStatus.yes)
+    assertEquals(result.similarity, 1.0)
+
   test("parseConfig accepts Lucene reporter with field name mapping"):
     val sourceIndexDir = Files.createTempDirectory("dedup2-confmain-lucene-source")
     val reportIndexDir = Files.createTempDirectory("dedup2-confmain-lucene-report")

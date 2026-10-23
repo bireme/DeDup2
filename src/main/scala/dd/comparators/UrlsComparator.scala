@@ -9,6 +9,7 @@ case class UrlElement(rawUrl: String,
                       decodedUrl: String,
                       host: String,
                       port: Int,
+                      path: String,
                       params: Map[String,String])
 
 class UrlsComparator(fieldName: String,
@@ -68,14 +69,14 @@ class UrlsComparator(fieldName: String,
                         currentUrl: UrlElement): Boolean = {
     val originalId: String = originalUrl.params.get("id").orElse(originalUrl.params.get("pid")).getOrElse("")
     val currentId: String = currentUrl.params.get("id").orElse(currentUrl.params.get("pid")).getOrElse("")
-    val bothEmpty: Boolean = originalId.isEmpty && currentId.isEmpty
-    val similar: Boolean = !bothEmpty && originalId.equals(currentId)
+    val bothEmptyId: Boolean = originalId.isEmpty && currentId.isEmpty
+    val sameId: Boolean = !bothEmptyId && originalId.equals(currentId)
+    val samePath: Boolean = originalUrl.path == currentUrl.path
 
     (originalUrl.host == currentUrl.host) &&
     (originalUrl.port == currentUrl.port) &&
-    similar
+    ((bothEmptyId && samePath) || sameId)
   }
-
 
   private def getUrls(doc: Document): Seq[UrlElement] =
     doc.fields
@@ -88,7 +89,7 @@ class UrlsComparator(fieldName: String,
   private def toUrlElement(value: String): UrlElement =
 
     val decodedValue = URLDecoder.decode(value, StandardCharsets.UTF_8)
-    val uri = URI.create(decodedValue)
+    val uri:URI = URI.create(decodedValue)
 
     val params =
       Option(uri.getQuery)
@@ -105,5 +106,6 @@ class UrlsComparator(fieldName: String,
       decodedUrl = uri.toURL.toString,
       host = uri.getHost,
       port = uri.getPort,
+      path = uri.getPath,
       params = params
     )

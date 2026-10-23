@@ -14,6 +14,7 @@ class LilacsSasHeuristicWeak extends Heuristics:
   private val issueField: String = "issue_number"
   private val authorField: String = "author"
   private val pageField: String = "pages"
+  private val urlField: String = "eletronic_address"
 
   /**
    * Determines whether the document pair is classified as duplicated.
@@ -36,12 +37,14 @@ class LilacsSasHeuristicWeak extends Heuristics:
             isSimilarOrUndefined(results, volumeField),
             isSimilarOrUndefined(results, issueField),
             isSimilarOrUndefined(results, authorField),
-            isSimilarOrUndefined(results, pageField)
+            isSimilarOrUndefined(results, pageField),
+            isSimilarOrUndefined(results, urlField)
           ).forall(identity)
         else
           Seq(
             isSimilar(results, volumeField),
             isSimilar(results, issueField),
             isSimilar(results, authorField),
-            isSimilar(results, pageField)
+            isSimilar(results, pageField),
+            isSimilarOrUndefined(results, urlField)
           ).forall(identity))
