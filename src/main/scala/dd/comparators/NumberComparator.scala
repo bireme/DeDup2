@@ -51,9 +51,11 @@ class NumberComparator(fieldName: String,
 
   /** Returns the first value of the configured field, or an empty string if absent. */
   private def fieldValue(document: Document): String =
-    document.fields.collectFirst:
-      case (`fieldName`, value) => Option(value).getOrElse("")
-    .getOrElse("")
+    document.fields
+      .collectFirst {
+        case (`fieldName`, value) => Option(value).getOrElse("")
+      }
+      .getOrElse("")
 
   /** Extracts an integer from the field or parses the entire field as Roman numerals. */
   private def extractNumber(value: String): Option[Int] =

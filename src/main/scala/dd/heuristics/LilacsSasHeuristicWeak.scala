@@ -14,7 +14,7 @@ class LilacsSasHeuristicWeak extends Heuristics:
   private val issueField: String = "issue_number"
   private val authorField: String = "author"
   private val pageField: String = "pages"
-  private val urlField: String = "eletronic_address"
+  private val urlField: String = "electronic_address"
 
   /**
    * Determines whether the document pair is classified as duplicated.

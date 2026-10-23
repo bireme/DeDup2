@@ -10,5 +10,5 @@
 9=centro_colaborador
 10=tipo_literatura
 11=nivel_de_tratamento
-12=endereco_eletronico
+12=electronic_address
 13=link_fiadmin
