@@ -8,6 +8,15 @@ import java.io.{ByteArrayOutputStream, PrintStream}
 import java.nio.file.Files
 
 class ToolsSuite extends munit.FunSuite:
+  test("roman2Indu converts canonical Roman numerals"):
+    assertEquals(Tools.roman2Indu("MCMXCIV"), Some(1994))
+    assertEquals(Tools.roman2Indu(" mmxxiv "), Some(2024))
+
+  test("roman2Indu returns None for invalid or empty input"):
+    assertEquals(Tools.roman2Indu("IIII"), None)
+    assertEquals(Tools.roman2Indu(""), None)
+    assertEquals(Tools.roman2Indu(null), None)
+
   test("parseSqlFileList parses comma-separated SQL files"):
     assertEquals(
       Tools.parseSqlFileList("one.sql, two.sql,three.sql").get,

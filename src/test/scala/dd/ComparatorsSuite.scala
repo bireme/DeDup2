@@ -1,6 +1,6 @@
 package dd
 
-import dd.comparators.{AuthorsComparator, DiceComparator, ExactComparator, JaccardComparator, LevenshteinComparator, LevenshteinJaccardComparator, NGramComparator, RegexComparator, UrlsComparator}
+import dd.comparators.{AuthorsComparator, DiceComparator, ExactComparator, JaccardComparator, LevenshteinComparator, LevenshteinJaccardComparator, NGramComparator, NumberComparator, RegexComparator, UrlsComparator}
 import dd.interfaces.{Document, SimilarityStatus}
 
 class ComparatorsSuite extends munit.FunSuite:
@@ -63,6 +63,45 @@ class ComparatorsSuite extends munit.FunSuite:
     assertEquals(result.currentField, decodedUrl)
     assertEquals(result.originalFieldOther, Some(decodedUrl))
     assertEquals(result.currentFieldOther, Some(decodedUrl))
+
+  test("NumberComparator extracts the first numeric match"):
+    val comparator = new NumberComparator("volume", regex = "\\d+")
+    val result = comparator.compare(
+      Document(Seq("volume" -> "vol. 012, issue 3")),
+      Document(Seq("volume" -> "Volume 12"))
+    )
+
+    assertEquals(result.originalFieldOther, Some("12"))
+    assertEquals(result.currentFieldOther, Some("12"))
+    assertEquals(result.isSimilar, SimilarityStatus.yes)
+    assertEquals(result.similarity, 1.0)
+
+  test("NumberComparator falls back to Roman numeral conversion when no number matches"):
+    val comparator = new NumberComparator("volume")
+    val result = comparator.compare(
+      Document(Seq("volume" -> "IX")),
+      Document(Seq("volume" -> "Volume 9"))
+    )
+
+    assertEquals(result.originalFieldOther, Some("9"))
+    assertEquals(result.currentFieldOther, Some("9"))
+    assertEquals(result.isSimilar, SimilarityStatus.yes)
+
+  test("NumberComparator returns no for different numbers and undefined for unparseable values"):
+    val comparator = new NumberComparator("volume")
+    val different = comparator.compare(
+      Document(Seq("volume" -> "IX")),
+      Document(Seq("volume" -> "10"))
+    )
+    val unparseable = comparator.compare(
+      Document(Seq("volume" -> "unknown")),
+      Document(Seq("volume" -> "10"))
+    )
+
+    assertEquals(different.isSimilar, SimilarityStatus.no)
+    assertEquals(different.similarity, 0.0)
+    assertEquals(unparseable.isSimilar, SimilarityStatus.undefined)
+    assertEquals(unparseable.similarity, 0.0)
 
   test("comparators mark two empty fields as undefined with zero similarity"):
     val left = Document(Seq("missing" -> "", "authors" -> "", "link" -> ""))
