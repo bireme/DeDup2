@@ -3,3 +3,4 @@ title=text
 title_monographic=text
 pages=_e
 pages=_f
+electronic_address=_u
