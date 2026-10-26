@@ -4,6 +4,7 @@ import dd.interfaces.{CompResult, Comparator, Document, SimilarityStatus}
 
 import java.net.{URI, URLDecoder}
 import java.nio.charset.StandardCharsets
+import scala.util.Try
 
 case class UrlElement(rawUrl: String,
                       decodedUrl: String,
@@ -84,7 +85,7 @@ class UrlsComparator(fieldName: String,
         case (`fieldName`, value) => value
       .toSeq
       .flatMap(_.split(occSeparator).filter(_.trim.nonEmpty))
-      .map(toUrlElement)
+      .flatMap(value => Try(toUrlElement(value.trim)).toOption)
 
   private def toUrlElement(value: String): UrlElement =
 
