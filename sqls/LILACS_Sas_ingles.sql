@@ -11,10 +11,10 @@ SELECT 'LILACS_Sas' AS dbase,
   a.`literature_type`,
   a.`treatment_level`,
   a.`status`,
-  CASE 
-	WHEN r.`electronic_address` IS NULL THEN ''
-	WHEN r.`electronic_address` = '[]' THEN ''
-	ELSE r.`electronic_address`
+  CASE
+        WHEN r.`electronic_address` IS NULL THEN ''
+        WHEN r.`electronic_address` = '[]' THEN ''
+        ELSE r.`electronic_address`
   END AS electronic_address,
   CONCAT('https://fi-admin.bvsalud.org/bibliographic/edit-analytic/',
   b.`reference_ptr_id`) AS link_fiadmin
@@ -27,4 +27,5 @@ JOIN `biblioref_reference` AS r
 ON b.`reference_ptr_id` = r.`id`
 WHERE b.`english_translated_title` <> ''
 AND b.`english_translated_title` <> 'x'
-AND LEFT(a.`literature_type`, 1) = 'S';
+AND LEFT(a.`literature_type`, 1) = 'S'
+AND a.`status` IN (-3, 0, 1);

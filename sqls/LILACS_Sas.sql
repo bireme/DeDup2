@@ -23,4 +23,5 @@ ON b.`source_id` = c.`reference_ptr_id`
 INNER JOIN `biblioref_reference` AS a
 ON b.`source_id` = a.`id` AND LEFT(a.`literature_type`,1) = 'S'
 INNER JOIN `biblioref_reference` AS r
-ON b.`reference_ptr_id` = r.`id`;
+ON b.`reference_ptr_id` = r.`id`
+WHERE r.`status` IN (-3, 0, 1);
