@@ -8,6 +8,7 @@ import dd.heuristics.Util.*
  * bibliographic field equality.
  */
 class LilacsSasHeuristic extends Heuristics:
+  private val titleField: String = "title"
   private val journalField: String = "title_serial"
   private val volumeField: String = "volume_serial"
   private val issueField: String = "issue_number"
@@ -31,10 +32,19 @@ class LilacsSasHeuristic extends Heuristics:
     if doc == null then false
     else
       isSimilar(results, journalField) &&
-        Seq(
-          isSimilar(results, volumeField),
-          isSimilar(results, issueField),
-          isSimilar(results, authorField),
-          isSimilar(results, pageField),
-          isSimilarOrUndefined(results, urlField)
-        ).forall(identity)
+        (if similarity(results, titleField) == 1.0 then
+          Seq(
+            isSimilarOrUndefined(results, volumeField),
+            isSimilarOrUndefined(results, issueField),
+            isSimilarOrUndefined(results, authorField),
+            isSimilarOrUndefined(results, pageField),
+            isSimilarOrUndefined(results, urlField)
+          ).forall(identity)
+        else
+          Seq(
+            isSimilar(results, volumeField),
+            isSimilar(results, issueField),
+            isSimilar(results, authorField),
+            isSimilar(results, pageField),
+            isSimilarOrUndefined(results, urlField)
+          ).forall(identity))

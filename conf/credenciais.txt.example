@@ -1,0 +1,11 @@
+# Modelo de conf/credenciais.txt. Copie para conf/credenciais.txt, preencha e
+# restrinja a leitura: chmod 600 conf/credenciais.txt
+#
+# Cada perfil é referenciado em conf/*.cfg por producer.mysql.credentials.
+# Formato de arquivo .properties do Java: <perfil>.user=<usuario> e <perfil>.pswd=<senha>.
+# O caractere \ na senha deve ser escrito como \\.
+#
+# Outro caminho pode ser informado com -Ddedup.credentials=<arquivo> ou com a
+# variável de ambiente DEDUP_CREDENTIALS.
+fiadmin.user=<usuario>
+fiadmin.pswd=<senha>

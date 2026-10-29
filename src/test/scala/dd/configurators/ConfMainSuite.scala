@@ -427,5 +427,47 @@ class ConfMainSuite extends munit.FunSuite:
 
     parsed.reporters.foreach(_.reporter.close().get)
 
+  test("parseSelfCheckDuplicatedConfig reads MySQL credentials from the credentials file profile"):
+    val reportFile = Files.createTempFile("dedup2-credentials-report", ".csv")
+    val configFile = Files.createTempFile("dedup2-credentials", ".json")
+    val credentialsFile = Files.createTempFile("dedup2-credenciais", ".txt")
+
+    Files.writeString(credentialsFile, "# test\nfiadmin.user=reader\nfiadmin.pswd=s3cr=t\n", StandardCharsets.UTF_8)
+    Files.writeString(configFile,
+      s"""{
+         |  "producer": { "mysql": { "host": "db.example.org", "dbnm": "dedup", "credentials": "fiadmin", "sqlfs": ["sql/sample.sql"] } },
+         |  "finder": { "lucene": { "index": "ignored", "searchField": "title", "minSimilarity": 0.8 } },
+         |  "comparators": [ { "exact": { "fieldName": "title", "normalize": true } } ],
+         |  "reporters": [ { "pipe": { "file": "${escape(reportFile.toString)}", "encoding": "UTF-8", "recordSeparator": "|", "putHeader": true } } ]
+         |}""".stripMargin, StandardCharsets.UTF_8)
+
+    val previous = sys.props.get("dedup.credentials")
+    sys.props("dedup.credentials") = credentialsFile.toString
+    try
+      val parsed = ConfMain.parseSelfCheckDuplicatedConfig(configFile.toFile).get
+      val mysql = parsed.source match
+        case SelfCheckMysqlSourceConfig(value) => value
+        case other => fail(s"Expected MySQL source, got $other")
+
+      assertEquals(mysql.mySqlUser, "reader")
+      assertEquals(mysql.mySqlPassword, "s3cr=t")
+      parsed.reporters.foreach(_.reporter.close().get)
+    finally
+      previous match
+        case Some(value) => sys.props("dedup.credentials") = value
+        case None => sys.props -= "dedup.credentials"
+
+  test("readCredentials reports missing keys and files without exposing credential values"):
+    val credentialsFile = Files.createTempFile("dedup2-credenciais", ".txt")
+    Files.writeString(credentialsFile, "fiadmin.user=reader\nfiadmin.pswd=topsecret\n", StandardCharsets.UTF_8)
+
+    val missingProfile = ConfMain.readCredentials(credentialsFile, "other")
+    assert(missingProfile.isFailure)
+    assert(missingProfile.failed.get.getMessage.contains("'other.user'"))
+    assert(!missingProfile.failed.get.getMessage.contains("topsecret"))
+
+    val missingFile = ConfMain.readCredentials(credentialsFile.resolveSibling("does-not-exist.txt"), "fiadmin")
+    assert(missingFile.failed.get.getMessage.startsWith("Credentials file not found"))
+
   private def escape(path: String): String =
     path.replace("\\", "\\\\")

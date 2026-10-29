@@ -160,7 +160,8 @@ object SplitRef {
             val lineNumber = index + 1
             processLine(line, lineNumber, fieldPositions, fieldSeparator) match
               case Success(fields) =>
-                writer.write(SQL2CSV.csvRecord(fields, fieldSeparator))
+                // Input fields are parsed without quoting, so they are written back verbatim.
+                writer.write(fields.mkString(fieldSeparator.toString))
                 writer.newLine()
               case Failure(exception) =>
                 System.err.println(s"Invalid CSV record $lineNumber: $line")
