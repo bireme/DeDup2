@@ -2,7 +2,6 @@
 1=id
 2=title
 3=title_serial
-4=publication_year
 5=volume_serial
 6=issue_number
 7=author

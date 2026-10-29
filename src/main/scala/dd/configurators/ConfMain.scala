@@ -2,7 +2,7 @@ package dd.configurators
 
 import dd.comparators.{AuthorsComparator, DiceComparator, ExactComparator, JaccardComparator, LevenshteinComparator, LevenshteinJaccardComparator, NGramComparator, NumberComparator, RegexComparator, UrlsComparator}
 import dd.finders.LuceneDocsFinder
-import dd.heuristics.{DirevHeuristic, LilacsMntHeuristic, LilacsMntamHeuristic, LilacsSasHeuristic, LilacsSasHeuristicWeak, LilacsSasSourceHeuristic, LisHeuristic}
+import dd.heuristics.{DirevHeuristic, LilacsMntHeuristic, LilacsMntamHeuristic, LilacsSasHeuristicStrong, LilacsSasHeuristic, LilacsSasHeuristicWeak, LilacsSasHeuristicWeak2, LilacsSasSourceHeuristic, LisHeuristic}
 import dd.interfaces.{Comparator, DocsFinder, DocsProducer, Heuristics, Reporter}
 import dd.producers.{CSVProducer, JsonProducer, LuceneProducer, MongoDBProducer, MongoDBProducerConfig, MySqlProducerConfig, MysqlProducer}
 import dd.reporters.{ConsoleReporter, JsonReporter, LuceneReporter, MongoDBReporter, PipeReporter}
@@ -117,10 +117,14 @@ object ConfMain:
 
   private val requiredReportFields: Seq[String] = Seq("dbase", "id")
   private val heuristicFactories: Map[String, () => Heuristics] = Map(
+    "LilacsSasHeuristicStrong" -> (() => new LilacsSasHeuristicStrong),
+    "dd.heuristics.LilacsSasHeuristicStrong" -> (() => new LilacsSasHeuristicStrong),
     "LilacsSasHeuristic" -> (() => new LilacsSasHeuristic),
     "dd.heuristics.LilacsSasHeuristic" -> (() => new LilacsSasHeuristic),
     "LilacsSasHeuristicWeak" -> (() => new LilacsSasHeuristicWeak),
     "dd.heuristics.LilacsSasHeuristicWeak" -> (() => new LilacsSasHeuristicWeak),
+    "LilacsSasHeuristicWeak2" -> (() => new LilacsSasHeuristicWeak2),
+    "dd.heuristics.LilacsSasHeuristicWeak2" -> (() => new LilacsSasHeuristicWeak2),
     "DirevHeuristic" -> (() => new DirevHeuristic),
     "dd.heuristics.DirevHeuristic" -> (() => new DirevHeuristic),
     "LisHeuristic" -> (() => new LisHeuristic),
@@ -459,17 +463,26 @@ object ConfMain:
    * `splitDocumentField` property names a JSON-array field whose occurrences
    * are emitted as separate documents instead of one `//@//`-joined value.
    *
+   * The optional `credentials` property names a profile of the credentials
+   * file whose user and password are used instead of `user` and `pswd`.
+   *
    * @param json JSON object containing the MySQL producer configuration
    * @return parsed MySQL producer configuration
    */
   private def parseMysqlProducerConfig(json: JsObject): MySqlProducerConfig =
     val map: collection.Map[String, JsValue] = json.value
+    val (user, password) =
+      optionalString(map, "credentials") match
+        case Some(profile) => readCredentials(credentialsFile, profile).get
+        case None =>
+          (optionalString(map, "mySqlUser").orElse(optionalString(map, "user")).getOrElse(throw new IllegalArgumentException("Missing 'mySqlUser'")),
+           optionalString(map, "mySqlPassword").orElse(optionalString(map, "pswd")).getOrElse(throw new IllegalArgumentException("Missing 'mySqlPassword'")))
     MySqlProducerConfig(
       mySqlHost = optionalString(map, "mySqlHost").orElse(optionalString(map, "host")).getOrElse(throw new IllegalArgumentException("Missing 'mySqlHost'")),
       mySqlPort = optionalInt(map, "mySqlPort").orElse(optionalInt(map, "port")).getOrElse(3306),
       mySqlDbname = optionalString(map, "mySqlDbname").orElse(optionalString(map, "dbnm")).getOrElse(throw new IllegalArgumentException("Missing 'mySqlDbname'")),
-      mySqlUser = optionalString(map, "mySqlUser").orElse(optionalString(map, "user")).getOrElse(throw new IllegalArgumentException("Missing 'mySqlUser'")),
-      mySqlPassword = optionalString(map, "mySqlPassword").orElse(optionalString(map, "pswd")).getOrElse(throw new IllegalArgumentException("Missing 'mySqlPassword'")),
+      mySqlUser = user,
+      mySqlPassword = password,
       sqlfs = optionalStringSeq(map, "sqlfs")
         .orElse(optionalStringSeq(map, "sqlf"))
         .orElse(optionalStringSeq(map, "sqls"))
@@ -482,6 +495,46 @@ object ConfMain:
       repetitiveSep = optionalString(map, "repetitiveSep"),
       splitDocumentField = optionalString(map, "splitDocumentField")
     )
+
+  /**
+   * Resolves the credentials file path.
+   *
+   * The path comes from the `dedup.credentials` system property, then from the
+   * `DEDUP_CREDENTIALS` environment variable, and defaults to `conf/credenciais.txt`.
+   *
+   * @return credentials file path
+   */
+  private def credentialsFile: java.nio.file.Path =
+    java.nio.file.Paths.get(
+      sys.props.get("dedup.credentials")
+        .orElse(sys.env.get("DEDUP_CREDENTIALS"))
+        .getOrElse("conf/credenciais.txt"))
+
+  /**
+   * Reads the user and password of a profile from a credentials file.
+   *
+   * The file uses the Java properties format with the keys
+   * `<profile>.user` and `<profile>.pswd`. Error messages name the missing
+   * key but never include credential values.
+   *
+   * @param file credentials file path
+   * @param profile credentials profile name
+   * @return user and password of the profile
+   */
+  private[dd] def readCredentials(file: java.nio.file.Path,
+                                  profile: String): Try[(String, String)] =
+    Try:
+      val properties = new java.util.Properties()
+      Using.resource(Files.newBufferedReader(file, java.nio.charset.StandardCharsets.UTF_8))(properties.load)
+
+      def value(key: String): String =
+        Option(properties.getProperty(s"$profile.$key")).map(_.trim).filter(_.nonEmpty)
+          .getOrElse(throw new IllegalArgumentException(s"Missing '$profile.$key' in credentials file $file"))
+
+      (value("user"), value("pswd"))
+    .recoverWith:
+      case _: java.nio.file.NoSuchFileException =>
+        scala.util.Failure(new IllegalArgumentException(s"Credentials file not found: $file"))
 
   /**
    * Parses the producer source supported by SelfCheckDuplicated.

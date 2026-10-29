@@ -15,12 +15,13 @@ class LilacsSasHeuristicWeak extends Heuristics:
   private val authorField: String = "author"
   private val pageField: String = "pages"
   private val urlField: String = "electronic_address"
+  private val minTrueConditions: Int = 4
 
   /**
    * Determines whether the document pair is classified as duplicated.
-   * Pairs below either title-similarity threshold are treated as different.
-   * Otherwise, pairs with all four bibliographic fields present and equal are
-   * treated as duplicated; all other pairs are not classified as duplicates.
+   * Pairs whose journal titles differ are treated as different. Otherwise, at
+   * least four of the five volume, issue, author, pages and URL conditions must
+   * hold; undefined values satisfy a condition when the titles are identical.
    *
    * @param doc document associated with the comparison pair
    * @param results comparator results containing both compared field values
@@ -39,7 +40,7 @@ class LilacsSasHeuristicWeak extends Heuristics:
             isSimilarOrUndefined(results, authorField),
             isSimilarOrUndefined(results, pageField),
             isSimilarOrUndefined(results, urlField)
-          ).forall(identity)
+          ).count(identity) >= minTrueConditions
         else
           Seq(
             isSimilar(results, volumeField),
@@ -47,4 +48,4 @@ class LilacsSasHeuristicWeak extends Heuristics:
             isSimilar(results, authorField),
             isSimilar(results, pageField),
             isSimilarOrUndefined(results, urlField)
-          ).forall(identity))
+          ).count(identity) >= minTrueConditions)
