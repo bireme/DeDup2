@@ -25,5 +25,5 @@ class DirevHeuristic extends Heuristics:
       val dates: (String, String) = Util.values(results, "start_date")
       val urls: (String, String) = Util.values(results, "link")
 
-      if titleComp == 1.0 then equalAndPresent(urls._1, urls._2)
+      if titleComp ~= 1.0 then equalAndPresent(urls._1, urls._2)
       else equalAndPresent(dates._1, dates._2) && equalAndPresent(urls._1, urls._2)

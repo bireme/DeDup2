@@ -24,6 +24,6 @@ class LilacsSasSourceHeuristic extends Heuristics:
       val matchingFields: Int = Seq(issn, volume, issue, year)
         .count((left, right) => equalAndPresent(left, right))
 
-      if titleSerialComp == 1.0 then
+      if titleSerialComp ~= 1.0 then
         matchingFields >= 3
       else matchingFields == 4
