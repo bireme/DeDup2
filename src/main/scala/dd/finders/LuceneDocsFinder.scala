@@ -51,6 +51,28 @@ class LuceneDocsFinder(luceneIndex: String,
                query: String,
                auxQuery: Option[String],
                maxDocs: Int = 1000): Try[DocsProducer] =
+    findScoredDocs(searchField, query, auxQuery, maxDocs).map: scored =>
+      new DocsProducer:
+        /**
+         * Returns the produced documents.
+         * @return iterator of produced documents
+         */
+        def getDocuments: Iterator[Document] = scored.map(_.document)
+
+  /**
+   * Finds the documents that match the given query, keeping the Lucene score
+   * and the similarity of the search field used to accept each candidate.
+   *
+   * @param searchField field used to find the query
+   * @param query main query string used to search for documents
+   * @param auxQuery optional secondary query used to refine the search
+   * @param maxDocs maximum number of documents to retrieve
+   * @return lazily converted candidates, in Lucene ranking order
+   */
+  def findScoredDocs(searchField: String,
+                     query: String,
+                     auxQuery: Option[String],
+                     maxDocs: Int = 1000): Try[Iterator[ScoredDocument]] =
     Try:
       require(query != null)
 
@@ -58,14 +80,8 @@ class LuceneDocsFinder(luceneIndex: String,
       val qur: Query = buildQuery(searchField, query, auxQuery, parser)
       val hits: Array[ScoreDoc] = isearcher.search(qur, maxDocs).scoreDocs
       val normalizedQuery = Tools.normalizeWordsStr(query)
-      val scoreDocs: Iterator[ScoreDoc] = hits.iterator
 
-      new DocsProducer:
-        /**
-         * Returns the produced documents.
-         * @return iterator of produced documents
-         */
-        def getDocuments: Iterator[Document] = lazyList(normalizedQuery, scoreDocs).iterator
+      lazyList(normalizedQuery, hits.iterator).iterator
 
   /** Builds the main Lucene query for a search request. */
   private def buildQuery(searchField: String,
@@ -143,30 +159,43 @@ class LuceneDocsFinder(luceneIndex: String,
    * @return lazy list of converted documents
    */
   private def lazyList(normalizedQuery: String,
-                       iterator: Iterator[ScoreDoc]): LazyList[Document] =
+                       iterator: Iterator[ScoreDoc]): LazyList[ScoredDocument] =
     Try:
       if iterator.hasNext then
-        val doc: document.Document = ireader.storedFields().document(iterator.next().doc)
+        val hit: ScoreDoc = iterator.next()
+        val doc: document.Document = ireader.storedFields().document(hit.doc)
 
-        if isSimilar(normalizedQuery, doc.get(searchField)) then
-          Tools.doc2doc(doc) #:: lazyList(normalizedQuery, iterator)
-        else lazyList(normalizedQuery, iterator)
-      else LazyList[Document]()
+        similarity(normalizedQuery, doc.get(searchField)) match
+          case Some(value) if value >= minSimilarity =>
+            ScoredDocument(Tools.doc2doc(doc), hit.score, value) #:: lazyList(normalizedQuery, iterator)
+          case _ => lazyList(normalizedQuery, iterator)
+      else LazyList[ScoredDocument]()
     .match
       case Success(ll) => ll
       case Failure(exception) =>
         exception.printStackTrace()
-        LazyList[Document]()
+        LazyList[ScoredDocument]()
 
   /**
-   * Determines whether a candidate meets the configured threshold.
+   * Computes the similarity between the source query and a candidate value.
    *
    * @param normalizedQuery normalized source query
    * @param candidate candidate field value
-   * @return true when the candidate meets the configured threshold
+   * @return LevenshteinJaccard score, or None when either side is empty
    */
-  private def isSimilar(normalizedQuery: String,
-                        candidate: String): Boolean =
+  private def similarity(normalizedQuery: String,
+                         candidate: String): Option[Double] =
     val normalizedCandidate = Tools.normalizeWordsStr(Option(candidate).getOrElse(""))
-    normalizedQuery.nonEmpty && normalizedCandidate.nonEmpty &&
-      LevenshteinJaccard.score(normalizedQuery, normalizedCandidate) >= minSimilarity
+    Option.when(normalizedQuery.nonEmpty && normalizedCandidate.nonEmpty):
+      LevenshteinJaccard.score(normalizedQuery, normalizedCandidate)
+
+/**
+ * Candidate found by LuceneDocsFinder.
+ *
+ * @param document stored candidate document
+ * @param score Lucene score of the hit
+ * @param similarity LevenshteinJaccard similarity of the search field
+ */
+final case class ScoredDocument(document: Document,
+                                score: Float,
+                                similarity: Double)

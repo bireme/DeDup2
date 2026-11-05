@@ -115,6 +115,24 @@ object ConfMain:
                                        index: Option[String],
                                        heuristic: Option[Heuristics] = None)
 
+  /**
+   * Search options of a configuration, used to look up candidates of one
+   * document without building the producer, the finder or the reporters.
+   *
+   * @param searchField Lucene field used for candidate retrieval
+   * @param minSimilarity minimum similarity accepted by the Lucene finder
+   * @param comparators comparison filters applied to each document pair
+   * @param auxQuery optional auxiliary query passed to the finder
+   * @param maxDocs optional maximum number of candidate documents
+   * @param heuristic optional duplicate heuristic used to filter candidates
+   */
+  case class SearchConfig(searchField: String,
+                          minSimilarity: Double,
+                          comparators: Seq[Comparator],
+                          auxQuery: Option[String],
+                          maxDocs: Option[Int],
+                          heuristic: Option[Heuristics])
+
   private val requiredReportFields: Seq[String] = Seq("dbase", "id")
   private val heuristicFactories: Map[String, () => Heuristics] = Map(
     "LilacsSasHeuristicStrong" -> (() => new LilacsSasHeuristicStrong),
@@ -172,6 +190,40 @@ object ConfMain:
     Using(Source.fromFile(jsonFile)):
       _.getLines().mkString("\n")
     .map(parseSelfCheckDuplicatedConfig)
+
+  /**
+   * Parses the search options of a configuration: Lucene search field,
+   * similarity threshold, auxiliary query, maximum candidates, comparators
+   * and heuristic. The producer, the Lucene index and the reporters are not
+   * opened.
+   *
+   * @param jsonFile configuration file to parse
+   * @return configured search options
+   */
+  def parseSearchConfig(jsonFile: File): Try[SearchConfig] =
+    Using(Source.fromFile(jsonFile)):
+      _.getLines().mkString("\n")
+    .flatMap(jsonStr => Try(parseSearchConfig(jsonStr)))
+
+  /**
+   * Parses the search options of a configuration from raw JSON.
+   *
+   * @param jsonStr raw JSON content to parse
+   * @return configured search options
+   */
+  private[dd] def parseSearchConfig(jsonStr: String): SearchConfig =
+    val json: JsValue = Json.parse(jsonStr)
+    val lucene: JsLookupResult = json \ "finder" \ "lucene"
+    val (searchField, comparators) = parseSimilarityConfig(jsonStr)
+
+    SearchConfig(
+      searchField = searchField,
+      minSimilarity = parseLuceneMinSimilarity(lucene),
+      comparators = comparators,
+      auxQuery = (lucene \ "auxQuery").asOpt[String].filter(_.nonEmpty),
+      maxDocs = (lucene \ "maxDocs").asOpt[Int],
+      heuristic = parseHeuristic(json)
+    )
 
   /**
    * Parses only the Lucene search field and comparators from the application
