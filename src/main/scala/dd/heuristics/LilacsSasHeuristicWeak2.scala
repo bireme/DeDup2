@@ -33,7 +33,7 @@ class LilacsSasHeuristicWeak2 extends Heuristics:
     if doc == null then false
     else
       isSimilar(results, journalField) &&
-        (if similarity(results, titleField) == 1.0 then
+        (if similarity(results, titleField) ~= 1.0 then
           Seq(
             isSimilarOrUndefined(results, volumeField),
             isSimilarOrUndefined(results, issueField),

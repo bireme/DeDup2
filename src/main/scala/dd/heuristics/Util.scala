@@ -5,6 +5,18 @@ import scala.util.Try
 
 /** Shared comparison helpers used by document heuristics. */
 object Util:
+  /** Tolerance used to absorb floating-point rounding errors in similarity scores. */
+  private val Epsilon: Double = 1e-9
+
+  extension (value: Double)
+    /**
+     * Compares two floating-point values allowing for rounding errors.
+     *
+     * @param other value to compare with
+     * @return {@code true} when both values differ by less than {@code Epsilon}
+     */
+    def ~=(other: Double): Boolean = math.abs(value - other) < Epsilon
+
   /**
    * Returns the similarity score for a comparator field.
    *

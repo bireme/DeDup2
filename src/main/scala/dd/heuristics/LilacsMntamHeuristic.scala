@@ -19,8 +19,8 @@ class LilacsMntamHeuristic extends Heuristics:
       val titleMonographicComp: Double = Util.similarity(results, "title_monographic")
       val authorComp: Double = Util.similarity(results, "author")
       val authorAndPageScoresAreZero: Boolean =
-        results.find(_.fieldName == "author").exists(_.similarity == 0.0) &&
-          results.find(_.fieldName == "pages").exists(_.similarity == 0.0)
+        results.find(_.fieldName == "author").exists(_.similarity ~= 0.0) &&
+          results.find(_.fieldName == "pages").exists(_.similarity ~= 0.0)
       val year: (String, String) = Util.values(results, "publication_year")
       val pages: (String, String) = Util.values(results, "pages")
       val authorMatch: Boolean = authorComp >= 0.8
@@ -31,8 +31,8 @@ class LilacsMntamHeuristic extends Heuristics:
       ).count(identity)
 
       if authorAndPageScoresAreZero then false
-      else if titleComp == 1.0 then
-        if titleMonographicComp == 1.0 then
+      else if titleComp ~= 1.0 then
+        if titleMonographicComp ~= 1.0 then
           matchingFields >= 2
         else matchingFields == 3
       else matchingFields == 3

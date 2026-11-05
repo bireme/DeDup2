@@ -341,8 +341,8 @@ class MysqlProducer(conf: MySqlProducerConfig) extends DocsProducer:
                               content: String,
                               repetitiveFields: Option[Set[String]],
                               repetitiveSep: Option[String]): Seq[String] =
-    repetitiveFields match
-      case Some(fields) if fields.contains(fieldName) => content.split(repetitiveSep.get).toSeq
+    (repetitiveFields, repetitiveSep) match
+      case (Some(fields), Some(sep)) if fields.contains(fieldName) => content.split(sep).toSeq
       case _ => Seq(content)
 
   /**
