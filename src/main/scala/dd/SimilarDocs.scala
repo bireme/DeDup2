@@ -302,9 +302,23 @@ object SimilarDocs:
   private[dd] def includeIndexedFieldDiceComparator(finder: DocsFinder,
                                                    comparators: Seq[Comparator]): Seq[Comparator] =
     (finder.getSearchField, finder.getMinSimilarity) match
-      case (Some(searchField), Some(minSimilarity)) if !hasDiceComparatorFor(comparators, searchField) =>
-        DiceComparator(searchField, normalize = true, minSimilarity) +: comparators
+      case (Some(searchField), Some(minSimilarity)) =>
+        includeIndexedFieldDiceComparator(searchField, minSimilarity, comparators)
       case _ => comparators
+
+  /**
+   * Ensures the comparators include one Dice comparator for the indexed field.
+   *
+   * @param searchField Lucene indexed field
+   * @param minSimilarity threshold of the Dice comparator, the same as the finder's
+   * @param comparators comparator list parsed from configuration
+   * @return comparator list with one Dice comparator for the indexed field
+   */
+  def includeIndexedFieldDiceComparator(searchField: String,
+                                        minSimilarity: Double,
+                                        comparators: Seq[Comparator]): Seq[Comparator] =
+    if hasDiceComparatorFor(comparators, searchField) then comparators
+    else DiceComparator(searchField, normalize = true, minSimilarity) +: comparators
 
   /** Indicates whether a Dice comparator covers the indexed field. */
   private def hasDiceComparatorFor(comparators: Seq[Comparator],
