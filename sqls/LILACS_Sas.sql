@@ -1,3 +1,4 @@
+# Novo Sas
 SELECT 'LILACS_Sas' AS dbase,
        b.`reference_ptr_id` AS `id`,
        b.`title`,
@@ -11,17 +12,17 @@ SELECT 'LILACS_Sas' AS dbase,
        a.`literature_type`,
        a.`treatment_level`,
        a.`status`,
+       b.`doi_number`,
        CASE
-           WHEN r.`electronic_address` IS NULL THEN ''
-           WHEN r.`electronic_address` = '[]' THEN ''
-           ELSE r.`electronic_address`
+           WHEN a.`electronic_address` IS NULL THEN ''
+           WHEN a.`electronic_address` = '[]' THEN ''
+           ELSE a.`electronic_address`
        END AS electronic_address,
        CONCAT('https://fi-admin.bvsalud.org/bibliographic/edit-analytic/', b.`reference_ptr_id`) AS link_fiadmin
-FROM `biblioref_referenceanalytic` AS b
+FROM `biblioref_reference` AS a
+INNER JOIN `biblioref_referenceanalytic` AS b
+ON a.`id` = b.`reference_ptr_id`
 INNER JOIN `biblioref_referencesource` AS c
 ON b.`source_id` = c.`reference_ptr_id`
-INNER JOIN `biblioref_reference` AS a
-ON b.`source_id` = a.`id` AND LEFT(a.`literature_type`,1) = 'S'
-INNER JOIN `biblioref_reference` AS r
-ON b.`reference_ptr_id` = r.`id`
-WHERE r.`status` IN (-3, 0, 1);
+WHERE a.`treatment_level` = 'as'
+AND a.`status` IN (-3, 0, 1);

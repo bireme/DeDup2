@@ -1,12 +1,33 @@
 package dd.heuristics
 
 import dd.interfaces.{CompResult, SimilarityStatus}
+
+import java.net.URI
+import java.net.http.{HttpClient, HttpRequest, HttpResponse}
+import java.time.Duration
+import java.util.Arrays
 import scala.util.Try
 
 /** Shared comparison helpers used by document heuristics. */
 object Util:
   /** Tolerance used to absorb floating-point rounding errors in similarity scores. */
   private val Epsilon: Double = 1e-9
+
+  /** Separator between occurrences of a multi-valued field. */
+  private val OccSeparator: String = "//@//"
+
+  /** Query parameters kept when building the URL whose content is downloaded. */
+  private val IdParameters: Set[String] = Set("id", "pid")
+
+  /** Maximum time spent downloading one URL. */
+  private val UrlTimeout: Duration = Duration.ofSeconds(20)
+
+  /** Shared HTTP client used to download URL contents. */
+  private lazy val httpClient: HttpClient =
+    HttpClient.newBuilder()
+      .connectTimeout(Duration.ofSeconds(10))
+      .followRedirects(HttpClient.Redirect.NORMAL)
+      .build()
 
   extension (value: Double)
     /**
@@ -71,6 +92,81 @@ object Util:
   def isSimilarOrUndefined(results: Seq[CompResult], fieldName: String): Boolean =
     results.find(_.fieldName == fieldName)
       .exists(result => result.isSimilar == SimilarityStatus.yes || result.isSimilar == SimilarityStatus.undefined)
+
+  /**
+   * Returns whether the URLs of a comparator field point to the same content.
+   *
+   * Each URL is reduced to scheme, host, port and path, keeping only the
+   * {@code id} and {@code pid} query parameters, and then downloaded. When a
+   * field holds several URLs separated by {@code //@//}, the pair is similar if
+   * any original URL has the same content as any current URL.
+   *
+   * @param results comparator results to search
+   * @param fieldName comparator field name
+   * @return {@code true} when both contents were downloaded and are equal;
+   *         {@code false} when a value is empty, no content could be
+   *         downloaded or the contents differ
+   */
+  def isUrlContentSimilar(results: Seq[CompResult], fieldName: String): Boolean =
+    results.find(_.fieldName == fieldName).exists: result =>
+      val originalUrls: Seq[String] = splitUrls(result.originalField)
+      val currentUrls: Seq[String] = splitUrls(result.currentField)
+
+      originalUrls.nonEmpty && currentUrls.nonEmpty && {
+        val originalContents: Seq[Array[Byte]] = originalUrls.flatMap(url => urlContent(contentUrl(url)))
+        lazy val currentContents: Seq[Array[Byte]] = currentUrls.flatMap(url => urlContent(contentUrl(url)))
+
+        originalContents.nonEmpty &&
+          currentContents.exists(current => originalContents.exists(original => Arrays.equals(original, current)))
+      }
+
+  /** Splits a field value into its non-empty URL occurrences. */
+  private def splitUrls(value: String): Seq[String] =
+    Option(value).toSeq
+      .flatMap(_.split(OccSeparator))
+      .map(_.trim)
+      .filter(_.nonEmpty)
+
+  /**
+   * Removes the query parameters of a URL, except {@code id} and {@code pid}.
+   * The fragment is dropped and HTML-escaped separators ({@code &amp;}) are
+   * accepted.
+   *
+   * @param url URL to reduce
+   * @return URL without the query parameters irrelevant to the content
+   */
+  private[heuristics] def contentUrl(url: String): String =
+    val withoutFragment: String = url.trim.takeWhile(_ != '#')
+    val queryStart: Int = withoutFragment.indexOf('?')
+
+    if queryStart < 0 then withoutFragment
+    else
+      val base: String = withoutFragment.substring(0, queryStart)
+      val kept: Seq[String] = withoutFragment.substring(queryStart + 1)
+        .replace("&amp;", "&")
+        .split("&")
+        .toSeq
+        .filter(param => IdParameters.contains(param.takeWhile(_ != '=').trim.toLowerCase))
+
+      if kept.isEmpty then base else kept.mkString(s"$base?", "&", "")
+
+  /**
+   * Downloads the content of a URL.
+   *
+   * @param url URL to download
+   * @return response body, or {@code None} when the URL is invalid,
+   *         unreachable or does not answer with a 2xx status
+   */
+  private def urlContent(url: String): Option[Array[Byte]] =
+    Try:
+      val request: HttpRequest = HttpRequest.newBuilder(URI.create(url))
+        .timeout(UrlTimeout)
+        .GET()
+        .build()
+      httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray())
+    .toOption
+      .filter(response => response.statusCode() / 100 == 2)
+      .map(_.body())
 
   /**
    * Parses a textual similarity value.

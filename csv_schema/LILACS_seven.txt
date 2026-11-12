@@ -11,3 +11,4 @@
 11=nivel_de_tratamento
 12=electronic_address
 13=link_fiadmin
+14=doi_number

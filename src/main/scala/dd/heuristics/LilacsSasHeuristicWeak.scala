@@ -8,14 +8,15 @@ import dd.heuristics.Util.*
  * bibliographic field equality using the weak heuristic variant.
  */
 class LilacsSasHeuristicWeak extends Heuristics:
-  private val titleField: String = "title"
-  private val journalField: String = "title_serial"
+  //private val titleField: String = "title"
+  //private val journalField: String = "title_serial"
   private val volumeField: String = "volume_serial"
   private val issueField: String = "issue_number"
   private val authorField: String = "author"
   private val pageField: String = "pages"
   private val urlField: String = "electronic_address"
-  private val minTrueConditions: Int = 4
+  private val doiField: String = "doi"
+  private val minTrueConditions: Int = 3
 
   /**
    * Determines whether the document pair is classified as duplicated.
@@ -29,23 +30,19 @@ class LilacsSasHeuristicWeak extends Heuristics:
    * @return {@code true} when the pair is classified as duplicated;
    *         {@code false} otherwise
    */
-  override def isDuplicated(doc: Document, results: Seq[CompResult]): Boolean =
-    if doc == null then false
-    else
-      isSimilar(results, journalField) &&
-        (if similarity(results, titleField) ~= 1.0 then
-          Seq(
-            isSimilarOrUndefined(results, volumeField),
-            isSimilarOrUndefined(results, issueField),
-            isSimilarOrUndefined(results, authorField),
-            isSimilarOrUndefined(results, pageField),
-            isSimilarOrUndefined(results, urlField)
-          ).count(identity) >= minTrueConditions
-        else
-          Seq(
-            isSimilar(results, volumeField),
-            isSimilar(results, issueField),
-            isSimilar(results, authorField),
-            isSimilar(results, pageField),
-            isSimilarOrUndefined(results, urlField)
-          ).count(identity) >= minTrueConditions)
+    override def isDuplicated(doc: Document,
+                              results: Seq[CompResult]): Boolean =
+      val similarFields: Seq[Boolean] = Seq(
+        isSimilar(results, volumeField),
+        isSimilar(results, issueField),
+        isSimilar(results, authorField),
+        isSimilar(results, pageField),
+      )
+      val similarFieldCount: Int = similarFields.count(identity)
+
+      similarFieldCount >= minTrueConditions && (
+        isSimilar(results, urlField) ||
+        isSimilar(results, doiField) ||
+        (isUndefined(results, urlField) && isUndefined(results, doiField) && similarFieldCount == similarFields.size) ||
+        isUrlContentSimilar(results, urlField)
+      )
