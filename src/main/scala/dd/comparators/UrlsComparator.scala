@@ -88,9 +88,7 @@ class UrlsComparator(fieldName: String,
       .flatMap(value => Try(toUrlElement(value.trim)).toOption)
 
   private def toUrlElement(value: String): UrlElement =
-
-    val decodedValue = URLDecoder.decode(value, StandardCharsets.UTF_8)
-    val uri:URI = URI.create(decodedValue)
+    val uri:URI = URI.create(UrlsComparator.cleanUrl(value))
 
     val params =
       Option(uri.getQuery)
@@ -110,3 +108,41 @@ class UrlsComparator(fieldName: String,
       path = uri.getPath,
       params = params
     )
+
+object UrlsComparator:
+  /** HTML entities found in URLs exported from fi-admin. */
+  private val HtmlEntities: Seq[(String, String)] =
+    Seq("&quot;" -> "\"", "&#34;" -> "\"", "&#39;" -> "'", "&lt;" -> "<", "&gt;" -> ">")
+
+  /** Characters not allowed by java.net.URI that may remain in a stored URL. */
+  private val IllegalChars: Map[Char, String] =
+    Map('"' -> "%22", ' ' -> "%20", '<' -> "%3C", '>' -> "%3E", '{' -> "%7B", '}' -> "%7D",
+        '|' -> "%7C", '\\' -> "%5C", '^' -> "%5E", '`' -> "%60")
+
+  /** Quote characters removed from the ends of a URL. */
+  private val Quotes: String = "\"'"
+
+  /**
+   * Cleans a stored URL so that java.net.URI can parse it.
+   *
+   * HTML entities are unescaped ({@code &amp;} becomes {@code &}, also when
+   * escaped more than once), the value is percent-decoded when possible,
+   * surrounding quotes and spaces are removed, and the remaining characters
+   * forbidden in a URI are percent-encoded.
+   *
+   * @param value URL as stored in the document
+   * @return URL ready to be parsed
+   */
+  private[dd] def cleanUrl(value: String): String =
+    val unescaped: String = HtmlEntities.foldLeft(unescapeAmp(value)):
+      case (acc, (entity, char)) => acc.replace(entity, char)
+    val decoded: String = Try(URLDecoder.decode(unescaped, StandardCharsets.UTF_8)).getOrElse(unescaped)
+    val trimmed: String = decoded.trim.dropWhile(Quotes.contains(_)).reverse.dropWhile(Quotes.contains(_)).reverse.trim
+
+    trimmed.flatMap(char => IllegalChars.getOrElse(char, char.toString))
+
+  /** Replaces {@code &amp;} until none is left, covering double escaping. */
+  @annotation.tailrec
+  private def unescapeAmp(value: String): String =
+    val replaced: String = value.replace("&amp;", "&")
+    if replaced == value then value else unescapeAmp(replaced)

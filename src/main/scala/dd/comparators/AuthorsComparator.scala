@@ -95,7 +95,7 @@ class AuthorsComparator(fieldName: String,
       val curSeq: Seq[Author] = current.authors
       val (fromSeq, toSeq) = if oriSeq.length <= curSeq.length then (oriSeq, curSeq) else (curSeq, oriSeq)
 
-      if fromSeq.length < toSeq.length * 0.8 then
+      if !AuthorsComparator.compatibleSizes(fromSeq.length, toSeq.length) then
         buildResult(score = 0, status = SimilarityStatus.no)
       else
         val isSimilar: Boolean = fromSeq.forall(existSimilar(_, toSeq))
@@ -228,6 +228,19 @@ object AuthorsComparator:
   private val RepeatedSpaces: Pattern = Pattern.compile(" {2,}")
   private val Comma: Pattern = Pattern.compile(" *, *")
   private val Diacritics: Pattern = Pattern.compile("[\\p{InCombiningDiacriticalMarks}]")
+
+  /**
+   * Checks whether two author lists have sizes that allow them to be similar:
+   * {@code t1 <= t2 <= ceil(t1 + t1 / 2)}, where {@code t1} is the size of the
+   * shorter list. The ceiling is computed with integers, as
+   * {@code (3 * t1 + 1) / 2}, to avoid floating-point rounding errors.
+   *
+   * @param shorterSize number of authors of the shorter list (t1)
+   * @param longerSize number of authors of the longer list (t2)
+   * @return {@code true} when the longer list has at most 50% more authors
+   */
+  private[dd] def compatibleSizes(shorterSize: Int, longerSize: Int): Boolean =
+    shorterSize <= longerSize && longerSize <= (3 * shorterSize + 1) / 2
 
   /**
    * Prints the command usage information and exits.

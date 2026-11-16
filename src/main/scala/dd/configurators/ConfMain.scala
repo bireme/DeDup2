@@ -2,7 +2,7 @@ package dd.configurators
 
 import dd.comparators.{AuthorsComparator, DiceComparator, ExactComparator, JaccardComparator, LevenshteinComparator, LevenshteinJaccardComparator, NGramComparator, NumberComparator, RegexComparator, UrlsComparator}
 import dd.finders.LuceneDocsFinder
-import dd.heuristics.{DirevHeuristic, LilacsMntHeuristic, LilacsMntamHeuristic, LilacsSasHeuristicStrong, LilacsSasHeuristic, LilacsSasHeuristicWeak, LilacsSasHeuristicWeak2, LilacsSasSourceHeuristic, LisHeuristic}
+import dd.heuristics.{DirevHeuristic, LilacsMntHeuristic, LilacsMntamHeuristic, LilacsSasHeuristicStrong, LilacsSasHeuristic, LilacsSasHeuristicWeak2, LilacsSasSourceHeuristic, LisHeuristic}
 import dd.interfaces.{Comparator, DocsFinder, DocsProducer, Heuristics, Reporter}
 import dd.producers.{CSVProducer, JsonProducer, LuceneProducer, MongoDBProducer, MongoDBProducerConfig, MySqlProducerConfig, MysqlProducer}
 import dd.reporters.{ConsoleReporter, JsonReporter, LuceneReporter, MongoDBReporter, PipeReporter}
@@ -139,8 +139,6 @@ object ConfMain:
     "dd.heuristics.LilacsSasHeuristicStrong" -> (() => new LilacsSasHeuristicStrong),
     "LilacsSasHeuristic" -> (() => new LilacsSasHeuristic),
     "dd.heuristics.LilacsSasHeuristic" -> (() => new LilacsSasHeuristic),
-    "LilacsSasHeuristicWeak" -> (() => new LilacsSasHeuristicWeak),
-    "dd.heuristics.LilacsSasHeuristicWeak" -> (() => new LilacsSasHeuristicWeak),
     "LilacsSasHeuristicWeak2" -> (() => new LilacsSasHeuristicWeak2),
     "dd.heuristics.LilacsSasHeuristicWeak2" -> (() => new LilacsSasHeuristicWeak2),
     "DirevHeuristic" -> (() => new DirevHeuristic),

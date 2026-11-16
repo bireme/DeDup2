@@ -221,7 +221,8 @@ class MysqlProducer(conf: MySqlProducerConfig) extends DocsProducer:
     statement.setFetchSize(MysqlProducer.MysqlStreamingFetchSize)
     val reader: BufferedSource = Source.fromFile(sqlFile)(using Codec(decoder))
     val content: String =
-      try reader.getLines().mkString(" ")
+      // Line breaks are kept so that "#" and "--" comments end at their own line.
+      try reader.getLines().mkString("\n")
       finally reader.close()
 
     print(s"Executing query file: $sqlFile ... ")

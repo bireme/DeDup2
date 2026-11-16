@@ -28,13 +28,38 @@ class ComparatorsSuite extends munit.FunSuite:
 
   test("AuthorsComparator does not split author lists on commas"):
     val comparator = new AuthorsComparator("authors")
+    // One author against three exceeds ceil(1 + 1/2) = 2. Were the commas
+    // separators, there would be two authors, and 2 x 3 would be accepted.
     val left = Document(Seq("authors" -> "Silva, Joao, Souza, Maria"))
-    val right = Document(Seq("authors" -> "Silva, Joao; Souza, Maria"))
+    val right = Document(Seq("authors" -> "Silva, Joao; Souza, Maria; Silva, Joao Souza"))
 
     val result = comparator.compare(left, right)
 
     assertEquals(result.isSimilar, SimilarityStatus.no)
     assertEquals(result.similarity, 0.0)
+
+  test("AuthorsComparator.compatibleSizes accepts t1 <= t2 <= ceil(t1 + t1 / 2)"):
+    val maxLonger = Map(1 -> 2, 2 -> 3, 3 -> 5, 4 -> 6, 5 -> 8, 6 -> 9, 7 -> 11, 8 -> 12, 9 -> 14, 10 -> 15)
+
+    maxLonger.foreach: (shorter, longer) =>
+      assert(AuthorsComparator.compatibleSizes(shorter, shorter), s"$shorter x $shorter")
+      assert(AuthorsComparator.compatibleSizes(shorter, longer), s"$shorter x $longer")
+      assert(!AuthorsComparator.compatibleSizes(shorter, longer + 1), s"$shorter x ${longer + 1}")
+    assert(!AuthorsComparator.compatibleSizes(4, 3))
+
+  test("AuthorsComparator accepts a longer list with up to 50% more authors"):
+    val comparator = new AuthorsComparator("authors")
+    val three = "Leão, Lara Stefânia Netto de Oliveira//@//Lima, Ana Beatriz Mori//@//Oliveira, Luciana Silva da Cruz"
+    val four = "Beatriz Mori Lima, Ana//@//Cristina Pimenta, Fabiana//@//Silva da Cruz Oliveira, Luciana" +
+      "//@//Stefânia Netto de Oliveira Leão, Lara"
+    val six = four + "//@//Souza, Pedro//@//Costa, Marcos"
+
+    def compare(left: String, right: String) =
+      comparator.compare(Document(Seq("authors" -> left)), Document(Seq("authors" -> right))).isSimilar
+
+    assertEquals(compare(three, four), SimilarityStatus.yes)
+    assertEquals(compare(four, three), SimilarityStatus.yes)
+    assertEquals(compare(three, six), SimilarityStatus.no)
 
   test("NGramComparator reports Dice result after ngram passes threshold"):
     val comparator = new NGramComparator("title", normalize = false, minSimilarity = 0.55)
@@ -63,6 +88,37 @@ class ComparatorsSuite extends munit.FunSuite:
     assertEquals(result.currentField, decodedUrl)
     assertEquals(result.originalFieldOther, Some(decodedUrl))
     assertEquals(result.currentFieldOther, Some(decodedUrl))
+
+  test("UrlsComparator reads pid from HTML-escaped URLs"):
+    val comparator = new UrlsComparator("link")
+    val scielo = "http://old.scielo.br/scielo.php?script=sci_arttext&amp;pid=S1519-698420040%s00001&amp;lng=en&amp;nrm=iso&amp;tlng=en"
+
+    def compare(original: String, current: String) =
+      comparator.compare(Document(Seq("link" -> original)), Document(Seq("link" -> current))).isSimilar
+
+    assertEquals(compare(scielo.format("03"), scielo.format("04")), SimilarityStatus.no)
+    assertEquals(compare(scielo.format("03"), scielo.format("03")), SimilarityStatus.yes)
+    assertEquals(compare(scielo.format("03"), scielo.format("03").replace("&amp;", "&")), SimilarityStatus.yes)
+    assertEquals(compare(scielo.format("03"), scielo.format("03").replace("&amp;", "&amp;amp;")), SimilarityStatus.yes)
+
+  test("UrlsComparator tolerates quotes and illegal characters"):
+    val comparator = new UrlsComparator("link")
+    val url = "http://old.scielo.br/scielo.php?script=sci_arttext&pid=S1519-69842004000%s00001&lng=en&tlng=en"
+
+    def compare(original: String, current: String) =
+      comparator.compare(Document(Seq("link" -> original)), Document(Seq("link" -> current))).isSimilar
+
+    assertEquals(compare(url.format("3") + "%22", url.format("4") + "%22"), SimilarityStatus.no)
+    assertEquals(compare(url.format("3") + "%22", url.format("3")), SimilarityStatus.yes)
+    assertEquals(compare("\"" + url.format("3") + "\"", url.format("3")), SimilarityStatus.yes)
+    assertEquals(compare(url.format("3") + "&title=a b", url.format("3")), SimilarityStatus.yes)
+
+  test("UrlsComparator.cleanUrl unescapes entities and encodes illegal characters"):
+    assertEquals(UrlsComparator.cleanUrl("http://h/p?a=1&amp;b=2"), "http://h/p?a=1&b=2")
+    assertEquals(UrlsComparator.cleanUrl(" \"http://h/p?a=1\" "), "http://h/p?a=1")
+    assertEquals(UrlsComparator.cleanUrl("http://h/p?a=1%22"), "http://h/p?a=1")
+    assertEquals(UrlsComparator.cleanUrl("http://h/p?q=a b"), "http://h/p?q=a%20b")
+    assertEquals(UrlsComparator.cleanUrl("http://h/p?q=100%"), "http://h/p?q=100%")
 
   test("NumberComparator extracts the first numeric match"):
     val comparator = new NumberComparator("volume", regex = "\\d+")
