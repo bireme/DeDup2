@@ -65,7 +65,7 @@ class LilacsSasHeuristic extends Heuristics:
           if getStatus(urlField, resultMap) == undefined && getStatus(doiField, resultMap) == undefined then
             (similarity(results, titleField) ~= 1.0) || (differentFieldCount == 0)
           else
-            isUrlContentSimilar(results, urlField)
+            hasSameFinalUrl(results, urlField)
       }
 
   private def getStatus(fieldName: String,

@@ -162,3 +162,24 @@ class UrlContentSuite extends munit.FunSuite:
     assertEquals(Util.urlDocumentStatus(results(s"$base/text/a", s"$base/text/b"), "other"), undefined)
     assert(Util.isUrlContentSimilar(results(s"$base/text/a", s"$base/text/b"), field))
     assert(!Util.isUrlContentSimilar(results(s"$base/text/a", s"$base/text/c"), field))
+
+  // hasSameFinalUrl: host, port and path after redirects.
+
+  test("hasSameFinalUrl compares host, port and path after redirects"):
+    def same(original: String, current: String): Boolean = Util.hasSameFinalUrl(results(original, current), field)
+
+    assert(same(s"$base/old/x", s"$base/old/y"))
+    assert(same(s"$base/old/x", s"$base/final"))
+    assert(same(s"$base/text/a?lang=pt&x=1", s"$base/text/a?x=2#top"))
+    assert(same(s"$base/missing//@//$base/old/x", s"$base/final"))
+    assert(!same(s"$base/text/a", s"$base/text/b"))
+    assert(!same(s"$base/text/a", s"http://localhost:${server().getAddress.getPort}/text/a/"))
+
+  test("hasSameFinalUrl is false for home-page redirects, unavailable URLs and empty values"):
+    def same(original: String, current: String): Boolean = Util.hasSameFinalUrl(results(original, current), field)
+
+    assert(!same(s"$base/home-redirect/1", s"$base/home-redirect/2"))
+    assert(!same(s"$base/missing", s"$base/missing"))
+    assert(!same("not a url", "not a url"))
+    assert(!same("", s"$base/text/a"))
+    assert(!Util.hasSameFinalUrl(results(s"$base/text/a", s"$base/text/a"), "other"))

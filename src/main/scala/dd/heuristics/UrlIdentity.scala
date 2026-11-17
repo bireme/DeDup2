@@ -80,12 +80,14 @@ object UrlIdentity:
   /**
    * What is kept of a downloaded URL.
    *
+   * @param finalUri address reached after redirects
    * @param finalUrl normalized address reached after redirects
    * @param identifiers identifiers read from the final address and the page metadata
    * @param shingles hashes of the word 3-shingles of the visible text (empty for non-HTML)
    * @param bodyHash SHA-256 of the body
    */
-  private[dd] final case class Page(finalUrl: String,
+  private[dd] final case class Page(finalUri: URI,
+                                    finalUrl: String,
                                     identifiers: Identifiers,
                                     shingles: Set[Int],
                                     bodyHash: String)
@@ -223,6 +225,17 @@ object UrlIdentity:
     DoiRegex.findFirstMatchIn(text)
       .map(_.group(1).reverse.dropWhile(".,;:)]}".contains(_)).reverse.toLowerCase)
 
+  /**
+   * Returns the address a URL ends at after following its redirects.
+   *
+   * @param url URL as stored in the document
+   * @return final address, or {@code None} when the URL is invalid,
+   *         unreachable, does not answer with a 2xx status or ends at the
+   *         root of a site
+   */
+  def finalUri(url: String): Option[URI] =
+    page(url).map(_.finalUri)
+
   /** Downloads a URL once and keeps the result in the cache. */
   private[dd] def page(url: String): Option[Page] =
     val key: String = fetchUrl(url)
@@ -283,10 +296,10 @@ object UrlIdentity:
     val isHtml: Boolean = contentType.toLowerCase.contains("html") ||
       (contentType.isEmpty && new String(body.take(512), StandardCharsets.ISO_8859_1).toLowerCase.contains("<html"))
 
-    if !isHtml then Page(normalizeUrl(finalUri), finalIdentifiers, Set.empty, bodyHash)
+    if !isHtml then Page(finalUri, normalizeUrl(finalUri), finalIdentifiers, Set.empty, bodyHash)
     else
       val html: String = new String(body, charset(contentType, body))
-      Page(normalizeUrl(finalUri), finalIdentifiers ++ metadataIdentifiers(html, finalUri),
+      Page(finalUri, normalizeUrl(finalUri), finalIdentifiers ++ metadataIdentifiers(html, finalUri),
            shingles(visibleText(html)), bodyHash)
 
   /** Charset from the Content-Type header or the page meta tags; UTF-8 by default. */
