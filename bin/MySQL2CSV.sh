@@ -7,20 +7,21 @@ export JAVA_HOME=$JAVA_HOME_25
 
 export PATH=$JAVA_HOME/bin:$PATH
 
-if [ "$#" -lt "7" ]
+if [ "$#" -lt "5" ]
   then
     echo "Export all MySQL result records into a csv file"
     echo "usage: MySQL2CSV <options>"
     echo "options:"
     echo "  -mySqlHost=<host>       MySQL server host address"
     echo "  -mySqlPort=<int>        MySQL server port"
-    echo "  -mySqlUser=<str>        MySQL database user"
-    echo "  -mySqlPassword=<str>    MySQL database password"
+    echo "  [-mySqlUser=<str>]      MySQL database user. Default: read from the credentials file."
+    echo "  [-mySqlPassword=<str>]  MySQL database password. Default: read from the credentials file."
+    echo "  [-credentials=<name>]   Profile of conf/credenciais.txt (or of the file in DEDUP_CREDENTIALS). Default is 'fiadmin'."
     echo "  -mySqlDbname=<str>      MySQL database name"
     echo "  -sqlfs=<name1>[,...,<nameN>] Comma-separated SQL statement files to execute sequentially."
     echo "	                             Results from each file are appended to the same output CSV during this run."
     echo "  -outCsvFile=<path>      Path to the output CSV file"
-    echo "  [-fieldSeparator=<char>] Character indicating the field separator. Default value is ','."
+    echo "  [-fieldSeparator=<char>] Character indicating the field separator. Default value is '|'."
     echo "	[-jsonFieldFile=<path>] Path to a text file with JSON field mappings, one per line, using: <column name>=<json field name>[-><new field name>]"
     echo "	                        For mapped SQL columns, object fields are extracted from the JSON content and emitted with the configured new field names."
     echo "	                        When <new field name> is omitted, the SQL column name is used as the output field name."

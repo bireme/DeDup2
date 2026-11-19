@@ -7,9 +7,11 @@ import scala.util.{Failure, Success, Try, Using}
 /**
  * Command-line utility that validates field counts in CSV files.
  *
- * The tool reads the input file lazily, checks whether each non-empty line has
+ * The tool reads the input file lazily, checks whether each non-empty record has
  * the expected number of separated fields, and reports malformed records or
- * encoding-related issues found during the scan.
+ * encoding-related issues found during the scan. Separators inside quoted
+ * values are not counted, and a quoted value may span several lines, as in the
+ * files written by SQL2CSV.
  */
 object CSVFileChecker:
   /**
@@ -21,7 +23,7 @@ object CSVFileChecker:
       |options:
       |	-csvFile=<path>          Path to the comma separated value file (csv)
       |	-numberOfFields=<num>    Number of fields in each line of the csv file
-      |	[-fieldSeparator=<char>] Character indication the field separator. Default value is ','.
+      |	[-fieldSeparator=<char>] Character indication the field separator. Default value is '|'.
       |	[-encoding=<str>]        The csv character encoding. Default value is 'utf-8'
       |	[-reportFile=<path>]     Path to an output file having the check results. Default behaviour is to print the results to the standard output
       |	[-stopAfter=<num>]       Stop checking after <num> errors were found. Defeault behaviour is to check until the end of the input file.""".stripMargin
@@ -51,7 +53,7 @@ object CSVFileChecker:
       _ <- processFile(
         parameters("csvFile"),
         parameters("numberOfFields").toInt,
-        parameters.getOrElse("fieldSeparator", ",").trim.head,
+        parameters.get("fieldSeparator").map(_.trim).flatMap(_.headOption).getOrElse(Tools.DefaultCsvFieldSeparator),
         parameters.getOrElse("encoding", "utf-8"),
         parameters.getOrElse("stopAfter", Integer.MAX_VALUE.toString).toInt,
         parameters.get("reportFile")
@@ -112,42 +114,83 @@ object CSVFileChecker:
       require(stopAfter > 0, "stopAfter parameter should be a positive number")
 
       val lines: Iterator[String] = source.getLines()
-      val separator: String = fieldSeparator match
-        case '|' => "\\|"
-        case x => x.toString
 
       /**
-       * Validates the current input line.
+       * Checks the number of fields of a complete record.
        *
-       * @param line input line currently being validated
-       * @param lineNumber line number associated with the current input line
-       * @return no value; this method validates the current line in place
+       * @param startLine line where the record starts
+       * @param separators number of separators found outside quotes
        */
-      def inspectLine(line: String, lineNumber: Int): Unit =
-        if line.trim.nonEmpty then
-          val split: Array[String] = line.split(separator)
-          if split.length != numberOfFields then
-            println(s"Invalid number of fields. Line[$lineNumber]=$line Fields:${split.length}")
+      def inspectRecord(startLine: Int, separators: Int): Unit =
+        val fields: Int = separators + 1
+        if fields != numberOfFields then
+          println(s"Invalid number of fields. Line[$startLine] Fields:$fields")
 
       /**
-       * Iterates through the remaining input lines.
+       * Iterates through the remaining input lines. A record whose quoted value
+       * holds a line break continues on the next lines.
        *
        * @param curLine current line number in the input iteration
+       * @param pending record still open inside quotes: start line and
+       *                separators found so far
        * @return no value; this method advances the line iteration in place
        */
       @tailrec
-      def loop(curLine: Int): Unit =
+      def loop(curLine: Int, pending: Option[(Int, Int)]): Unit =
         if hasNext(lines, curLine) then
           if curLine % 10000 == 0 then println(s"+++$curLine")
 
-          Try(lines.next()) match
-            case Success(line) => inspectLine(line, curLine)
-            case Failure(exception) =>
-              println(s"Possible character encoding error. Line[$curLine] Error:${exception.toString}")
+          val next: Option[(Int, Int)] =
+            Try(lines.next()) match
+              case Success(line) =>
+                pending match
+                  case None if line.trim.isEmpty => None
+                  case _ =>
+                    val (startLine, separators) = pending.getOrElse((curLine, 0))
+                    val (lineSeparators, stillQuoted) = scanLine(line, fieldSeparator, inQuotes = pending.nonEmpty)
+                    if stillQuoted then Some((startLine, separators + lineSeparators))
+                    else
+                      inspectRecord(startLine, separators + lineSeparators)
+                      None
+              case Failure(exception) =>
+                println(s"Possible character encoding error. Line[$curLine] Error:${exception.toString}")
+                pending
 
-          loop(curLine + 1)
+          loop(curLine + 1, next)
+        else
+          pending.foreach((startLine, _) => println(s"Unclosed quote. Record starting at line[$startLine]"))
 
-      loop(curLine = 1)
+      loop(curLine = 1, pending = None)
+
+  /**
+   * Counts the field separators of a line that are outside quoted values.
+   *
+   * Follows the quoting written by SQL2CSV (RFC 4180): a quote opens or closes
+   * a quoted value and two consecutive quotes inside a quoted value are an
+   * escaped quote.
+   *
+   * @param line line to scan
+   * @param fieldSeparator field separator
+   * @param inQuotes whether the line starts inside a quoted value (continuation
+   *                 of the previous line)
+   * @return separators found outside quotes, and whether the line ends inside
+   *         a quoted value
+   */
+  private[tools] def scanLine(line: String,
+                              fieldSeparator: Char,
+                              inQuotes: Boolean): (Int, Boolean) =
+    @tailrec
+    def scan(index: Int, separators: Int, quoted: Boolean): (Int, Boolean) =
+      if index >= line.length then (separators, quoted)
+      else
+        val char: Char = line.charAt(index)
+        if char == '"' then
+          if quoted && index + 1 < line.length && line.charAt(index + 1) == '"' then scan(index + 2, separators, quoted)
+          else scan(index + 1, separators, !quoted)
+        else if char == fieldSeparator && !quoted then scan(index + 1, separators + 1, quoted)
+        else scan(index + 1, separators, quoted)
+
+    scan(0, 0, inQuotes)
 
   /**
    * Checks whether another input line is available.

@@ -330,11 +330,21 @@ class ConfMainSuite extends munit.FunSuite:
     assertEquals(parsed.maxDocs, Some(20))
     assertEquals(parsed.outCsvFile, Some("self.csv"))
     assertEquals(parsed.index, Some("self-index"))
+    assertEquals(parsed.csvFieldSeparator, '|')
     assertEquals(parsed.comparators.size, 1)
     assertEquals(parsed.reporters.size, 1)
     assertEquals(parsed.reporters.head.otherFields, Seq("dbase", "id", "title"))
 
     parsed.reporters.foreach(_.reporter.close().get)
+
+  test("parseSelfCheckFieldSeparator defaults to the pipe and accepts one character"):
+    assertEquals(ConfMain.parseSelfCheckFieldSeparator(None), '|')
+    assertEquals(ConfMain.parseSelfCheckFieldSeparator(Some("")), '|')
+    assertEquals(ConfMain.parseSelfCheckFieldSeparator(Some(",")), ',')
+    assertEquals(ConfMain.parseSelfCheckFieldSeparator(Some(";")), ';')
+    assertEquals(ConfMain.parseSelfCheckFieldSeparator(Some("\t")), '\t')
+    Seq("||", "\"", " ", "\n", "\r").foreach: invalid =>
+      intercept[IllegalArgumentException](ConfMain.parseSelfCheckFieldSeparator(Some(invalid)))
 
   test("parseSelfCheckDuplicatedConfig creates parent directories for pipe reporter files"):
     val baseDir = Files.createTempDirectory("dedup2-selfcheck-report-parent")
@@ -419,6 +429,57 @@ class ConfMainSuite extends munit.FunSuite:
     assertEquals(csv.schema, Map(0 -> "dbase", 1 -> "id", 2 -> "title"))
     assertEquals(csv.hasHeader, true)
     assertEquals(csv.fieldSeparator, ';')
+    assertEquals(csv.encoding, "UTF-8")
+    assertEquals(parsed.searchField, "title")
+    assertEquals(parsed.minSimilarity, 0.8)
+    assertEquals(parsed.comparators.size, 1)
+    assertEquals(parsed.reporters.size, 1)
+
+    parsed.reporters.foreach(_.reporter.close().get)
+
+  test("CSV producer uses the pipe when fieldSeparator is absent"):
+    val csvFile = Files.createTempFile("dedup2-selfcheck-source", ".csv")
+    val reportFile = Files.createTempFile("dedup2-selfcheck-csv-report", ".csv")
+    val configFile = Files.createTempFile("dedup2-selfcheck-csv", ".json")
+
+    Files.writeString(csvFile, "dbase|id|title\nLILACS|1|sample\n", StandardCharsets.UTF_8)
+
+    val config =
+      s"""{
+         |  "producer": {
+         |    "csv": {
+         |      "file": "${escape(csvFile.toString)}",
+         |      "schema": "0=dbase,1=id,2=title",
+         |      "hasHeader": true,
+         |      "encoding": "UTF-8"
+         |    }
+         |  },
+         |  "finder": {
+         |    "lucene": {
+         |      "index": "ignored-by-self-check",
+         |      "searchField": "title",
+         |      "minSimilarity": 0.8
+         |    }
+         |  },
+         |  "comparators": [
+         |    { "exact": { "fieldName": "title", "normalize": true } }
+         |  ],
+         |  "reporters": [
+         |    { "pipe": { "file": "${escape(reportFile.toString)}", "encoding": "UTF-8", "recordSeparator": "|", "putHeader": true } }
+         |  ]
+         |}""".stripMargin
+
+    Files.writeString(configFile, config, StandardCharsets.UTF_8)
+
+    val parsed = ConfMain.parseSelfCheckDuplicatedConfig(configFile.toFile).get
+    val csv = parsed.source match
+      case SelfCheckCsvSourceConfig(value) => value
+      case other => fail(s"Expected CSV source, got $other")
+
+    assertEquals(csv.csvFile, csvFile.toString)
+    assertEquals(csv.schema, Map(0 -> "dbase", 1 -> "id", 2 -> "title"))
+    assertEquals(csv.hasHeader, true)
+    assertEquals(csv.fieldSeparator, '|')
     assertEquals(csv.encoding, "UTF-8")
     assertEquals(parsed.searchField, "title")
     assertEquals(parsed.minSimilarity, 0.8)

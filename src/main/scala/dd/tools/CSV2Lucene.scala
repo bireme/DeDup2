@@ -26,7 +26,7 @@ object CSV2Lucene:
       |	-schema=(<pos>=<fieldName>,...,<pos>=<fieldName>|file=<path>) Associate the csv field position (start with 0)
       |		with the Lucene document field name. If the parameter starts with file= then the corresponding schema file path will be used.
       |	-fieldToIndex=<name> Name of the field to be indexed
-      |	[-fieldSeparator=<char>] Character indication the field separator. Default value is ','.
+      |	[-fieldSeparator=<char>] Character indication the field separator. Default value is '|'.
       |	[-encoding=<str>] The csv character encoding. Default value is 'utf-8'
       |	[--hasHeader] If present indicates the csv file has header.""".stripMargin
 
@@ -61,7 +61,7 @@ object CSV2Lucene:
         parameters("csvFile"),
         schemaMap,
         parameters.contains("hasHeader"),
-        parameters.getOrElse("fieldSeparator", ",").head,
+        parameters.get("fieldSeparator").flatMap(_.headOption).getOrElse(Tools.DefaultCsvFieldSeparator),
         parameters.getOrElse("encoding", "utf-8")
       )
       _ = println("Indexing ...")

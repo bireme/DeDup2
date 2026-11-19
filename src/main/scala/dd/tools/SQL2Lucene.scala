@@ -21,8 +21,10 @@ object SQL2Lucene:
     """usage: SQL2Lucene <options>
       |options:
       |	-mySqlHost=<host>       MySQL server host address
-      |	-mySqlUser=<str>        MySQL database user
-      |	-mySqlPassword=<str>    MySQL database password
+      |	[-mySqlUser=<str>]      MySQL database user. Default: read from the credentials file.
+      |	[-mySqlPassword=<str>]  MySQL database password. Default: read from the credentials file.
+      |	[-credentials=<name>]   Profile of conf/credenciais.txt (or of the file in DEDUP_CREDENTIALS)
+      |	                        used when -mySqlUser/-mySqlPassword are absent. Default is 'fiadmin'.
       |	-mySqlDbname=<str>      MySQL database name
       |	-sqlfs=<name1>[,...,<nameN>] Comma-separated SQL statement files to execute sequentially.
       |	                        Results from each file are appended to the same Lucene index during this run.
@@ -65,7 +67,8 @@ object SQL2Lucene:
     for
       rawParameters <- parseArgs(args)
       parameters = normalizeAliases(rawParameters)
-      _ <- requireParameters(parameters, "mySqlHost", "mySqlUser", "mySqlPassword", "mySqlDbname", "sqlfs", "index", "fieldToIndex")
+      _ <- requireParameters(parameters, "mySqlHost", "mySqlDbname", "sqlfs", "index", "fieldToIndex")
+      (mySqlUser, mySqlPassword) <- Tools.mySqlCredentials(parameters)
       _ = logParameters(parameters)
       jsonFields <- parseJsonFieldMapping(parameters.get("jsonFieldFile"))
       sqlFiles <- Tools.parseSqlFileList(parameters("sqlfs"))
@@ -79,8 +82,8 @@ object SQL2Lucene:
         mySqlHost = parameters("mySqlHost"),
         mySqlPort = parameters.getOrElse("mySqlPort", "3306").toInt,
         mySqlDbname = parameters("mySqlDbname"),
-        mySqlUser = parameters("mySqlUser"),
-        mySqlPassword = parameters("mySqlPassword"),
+        mySqlUser = mySqlUser,
+        mySqlPassword = mySqlPassword,
         sqlfs = sqlFiles,
         sqlEncoding = parameters.getOrElse("sqlEncoding", "utf-8"),
         jsonFields = jsonFields,
@@ -141,7 +144,7 @@ object SQL2Lucene:
    */
   private def logParameters(parameters: Map[String, String]): Unit =
     println("Parameters:")
-    parameters.foreach(param => println(s"\t${param._1}=${param._2}"))
+    parameters.foreach((name, value) => println(s"\t$name=${Tools.loggableParameter(name, value)}"))
     println()
 
   /**

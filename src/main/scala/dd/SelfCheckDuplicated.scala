@@ -34,8 +34,12 @@ object SelfCheckDuplicated:
       |     "selfCheckDuplicated": {
       |       "outCsvFile": "path/to/generated.csv",
       |       "index": "path/to/generated-lucene-index",
-      |       "encoding": "utf-8"
-      |     }""".stripMargin
+      |       "encoding": "utf-8",
+      |       "fieldSeparator": "|"
+      |     }
+      |
+      |     fieldSeparator is the field separator of the CSV generated from producer/mysql
+      |     (one character, default '|'). producer/csv uses its own fieldSeparator.""".stripMargin
 
   /**
    * Entry point used when the self-check workflow is executed from the command line.
@@ -139,15 +143,15 @@ object SelfCheckDuplicated:
         for
           csvFile <- outputCsvFile(config)
           _ = println(s"Generating CSV file: $csvFile...")
-          _ <- SQL2CSV.exportRecords(mysql, csvFile)
+          _ <- SQL2CSV.exportRecords(mysql, csvFile, config.csvFieldSeparator)
           _ = println("CSV File generated.")
-          schema <- schemaFromCsvHeader(csvFile, config.csvEncoding)
+          schema <- schemaFromCsvHeader(csvFile, config.csvEncoding, config.csvFieldSeparator)
           _ <- SimilarDocs.requireSchemaFields(schema)
         yield PreparedCsvSource(
           csvFile = csvFile,
           schema = schema,
           hasHeader = true,
-          fieldSeparator = ',',
+          fieldSeparator = config.csvFieldSeparator,
           encoding = config.csvEncoding
         )
 
@@ -167,17 +171,19 @@ object SelfCheckDuplicated:
    *
    * @param csvFile CSV file whose header should be inspected
    * @param encoding character encoding used to read the CSV file
+   * @param fieldSeparator CSV field separator
    * @return schema mapping CSV positions to field names
    */
   private def schemaFromCsvHeader(csvFile: String,
-                                  encoding: String): Try[Map[Int, String]] =
+                                  encoding: String,
+                                  fieldSeparator: Char): Try[Map[Int, String]] =
     val header: Try[String] = Using(Source.fromFile(csvFile)(using Codec(encoding))):
       source =>
         source.getLines()
           .find(_.trim.nonEmpty)
           .getOrElse(throw IllegalArgumentException(s"Empty CSV file: $csvFile"))
 
-    header.flatMap(parseCsvLine).flatMap:
+    header.flatMap(parseCsvLine(_, fieldSeparator)).flatMap:
       fields =>
         Try:
           if fields.isEmpty then throw IllegalArgumentException(s"Empty CSV header: $csvFile")
@@ -192,9 +198,10 @@ object SelfCheckDuplicated:
    * Parses one CSV line using RFC 4180-style quote handling.
    *
    * @param line CSV line to parse
+   * @param fieldSeparator CSV field separator
    * @return parsed field values from the line
    */
-  private def parseCsvLine(line: String): Try[Seq[String]] =
+  private[dd] def parseCsvLine(line: String, fieldSeparator: Char): Try[Seq[String]] =
     Try:
       val fields: mutable.ReusableBuilder[String, Vector[String]] = Vector.newBuilder[String]
       val current: StringBuilder = new StringBuilder
@@ -207,7 +214,7 @@ object SelfCheckDuplicated:
           current.append('"')
           index += 1
         else if char == '"' then inQuotes = !inQuotes
-        else if char == ',' && !inQuotes then
+        else if char == fieldSeparator && !inQuotes then
           fields += current.toString()
           current.clear()
         else current.append(char)

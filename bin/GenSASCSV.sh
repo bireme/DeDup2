@@ -17,6 +17,8 @@ elif [ -f ./dedup.inc ]; then
   unset DEDUP_VALIDATE_PATHS
 fi
 
-bin/MySQL2CSV.sh -mySqlHost=$mysqlserver -mySqlPort=$mysqlport -mySqlUser=$servername -mySqlPassword=$serverpassword -mySqlDbname=$serverdatabase -sqlfs=sqls/LILACS_Sas.sql,sqls/LILACS_Sas_ingles.sql -outCsvFile=csv/LILACS_Sas.csv -jsonFieldFile=conf/jsonFields.txt -splitDocumentField=title
+. bin/mysqlConnection.inc || exit 1
+
+bin/MySQL2CSV.sh -mySqlHost=$mysqlserver -mySqlPort=$mysqlport -mySqlDbname=$serverdatabase -sqlfs=sqls/LILACS_Sas.sql,sqls/LILACS_Sas_ingles.sql -outCsvFile=csv/LILACS_Sas.csv -jsonFieldFile=conf/jsonFields.txt -splitDocumentField=title -fieldSeparator='|'
 
 cd - || exit

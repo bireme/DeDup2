@@ -7,7 +7,7 @@ export JAVA_HOME=$JAVA_HOME_25
 
 export PATH=$JAVA_HOME/bin:$PATH
 
-if [ "$#" -lt "7" ]
+if [ "$#" -lt "5" ]
   then
     echo 'MySQL2Lucene shell takes a list of documents retrieved from a MySQL database and'
     echo 'creates a DeDup index with them. If such index already exists, it will rewritten.'
@@ -15,8 +15,9 @@ if [ "$#" -lt "7" ]
     echo 'usage: MySQL2Lucene <options>'
     echo 'options:'
     echo '	-mySqlHost=<host>       MySQL server host address'
-    echo '	-mySqlUser=<str>        MySQL database user'
-    echo '	-mySqlPassword=<str>    MySQL database password'
+    echo '	[-mySqlUser=<str>]      MySQL database user. Default: read from the credentials file.'
+    echo '	[-mySqlPassword=<str>]  MySQL database password. Default: read from the credentials file.'
+    echo '	[-credentials=<name>]   Profile of conf/credenciais.txt (or of the file in DEDUP_CREDENTIALS). Default is "fiadmin".'
     echo '	-mySqlDbname=<str>      MySQL database name'
     echo '	-sqlfs=<name1>[,...,<nameN>] Comma-separated SQL statement files to execute sequentially.'
     echo '	                        Results from each file are appended to the same Lucene index during this run.'

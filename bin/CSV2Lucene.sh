@@ -18,7 +18,7 @@ if [ "$#" -lt "4" ]
     echo '  -schema=(<pos>=<fieldName>,...,<pos>=<fieldName>|file=<path>) Associate the csv field position (start with 0)'
     echo '    with the Lucene document field name. If the parameter starts with file= then the corresponding schema file path will be used.'
     echo '  -fieldToIndex=<name> Name of the field to be indexed'
-    echo '  [-fieldSeparator=<char>] Character indication the field separator. Default value is ",".'
+    echo '  [-fieldSeparator=<char>] Character indication the field separator. Default value is "|".'
     echo '  [-encoding=<str>] The csv character encoding. Default value is "utf-8"'
     echo '  [--hasHeader] If present indicates the csv file has header.""".stripMargin'
 fi

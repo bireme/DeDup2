@@ -27,13 +27,15 @@ object SQL2CSV:
       |options:
       |	-mySqlHost=<host>       MySQL server host address
       |	-mySqlPort=<int>        MySQL server port
-      |	-mySqlUser=<str>        MySQL database user
-      |	-mySqlPassword=<str>    MySQL database password
+      |	[-mySqlUser=<str>]      MySQL database user. Default: read from the credentials file.
+      |	[-mySqlPassword=<str>]  MySQL database password. Default: read from the credentials file.
+      |	[-credentials=<name>]   Profile of conf/credenciais.txt (or of the file in DEDUP_CREDENTIALS)
+      |	                        used when -mySqlUser/-mySqlPassword are absent. Default is 'fiadmin'.
       |	-mySqlDbname=<str>      MySQL database name
       |	-sqlfs=<name1>[,...,<nameN>] Comma-separated SQL statement files to execute sequentially.
       |	                        Results from each file are appended to the same output CSV during this run.
       |	-outCsvFile=<path>      Path to the output CSV file
-      |	[-fieldSeparator=<char>] Character indicating the field separator. Default value is ','.
+      |	[-fieldSeparator=<char>] Character indicating the field separator. Default value is '|'.
       |	[-jsonFieldFile=<path>] Path to a text file with JSON field mappings, one per line, using: <column name>=<json field name>[-><new field name>]
       |	                        For mapped SQL columns, object fields are extracted from the JSON content and emitted with the configured new field names.
       |	                        When <new field name> is omitted, the SQL column name is used as the output field name.
@@ -61,7 +63,8 @@ object SQL2CSV:
   def run(args: Array[String]): Try[Unit] =
     for
       parameters <- parseArgs(args)
-      _ <- requireParameters(parameters, "mySqlHost", "mySqlPort", "mySqlUser", "mySqlPassword", "mySqlDbname", "sqlfs", "outCsvFile")
+      _ <- requireParameters(parameters, "mySqlHost", "mySqlPort", "mySqlDbname", "sqlfs", "outCsvFile")
+      (mySqlUser, mySqlPassword) <- Tools.mySqlCredentials(parameters)
       _ = logParameters(parameters)
       jFields <- parseJsonFieldMapping(parameters.get("jsonFieldFile"))
       sqlFiles <- Tools.parseSqlFileList(parameters("sqlfs"))
@@ -70,8 +73,8 @@ object SQL2CSV:
         mySqlHost = parameters("mySqlHost"),
         mySqlPort = parameters("mySqlPort").toInt,
         mySqlDbname = parameters("mySqlDbname"),
-        mySqlUser = parameters("mySqlUser"),
-        mySqlPassword = parameters("mySqlPassword"),
+        mySqlUser = mySqlUser,
+        mySqlPassword = mySqlPassword,
         sqlfs = sqlFiles,
         sqlEncoding = parameters.getOrElse("sqlEncoding", "utf-8"),
         jsonFields = jFields,
@@ -111,7 +114,7 @@ object SQL2CSV:
    */
   private def logParameters(parameters: Map[String, String]): Unit =
     println("Parameters:")
-    parameters.foreach(param => println(s"\t${param._1}=${param._2}"))
+    parameters.foreach((name, value) => println(s"\t$name=${Tools.loggableParameter(name, value)}"))
     println()
 
   /**
@@ -122,7 +125,7 @@ object SQL2CSV:
    */
   private def parseFieldSeparator(separator: Option[String]): Try[Char] =
     separator.map(_.trim) match
-      case None => Success(',')
+      case None => Success(Tools.DefaultCsvFieldSeparator)
       case Some(value) if value.length == 1 => Success(value.head)
       case Some(value) => Failure(IllegalArgumentException(s"Invalid fieldSeparator [$value]. Expected a single character."))
 
@@ -158,7 +161,7 @@ object SQL2CSV:
    */
   def exportRecords(conf: MySqlProducerConfig,
                     outCsvFile: String): Try[Unit] =
-    exportRecords(conf, outCsvFile, ',')
+    exportRecords(conf, outCsvFile, Tools.DefaultCsvFieldSeparator)
 
   /**
    * Exports the selected records to a CSV file.
@@ -184,7 +187,7 @@ object SQL2CSV:
   def exportRecords(conf: MySqlProducerConfig,
                     sqlFiles: Seq[String],
                     outCsvFile: String): Try[Unit] =
-    exportRecords(conf, sqlFiles, outCsvFile, ',')
+    exportRecords(conf, sqlFiles, outCsvFile, Tools.DefaultCsvFieldSeparator)
 
   /**
    * Exports records selected by multiple SQL files to one CSV file.

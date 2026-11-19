@@ -52,6 +52,8 @@ elif [ -f "$PROJECT_DIR/dedup.inc" ]; then
   unset DEDUP_VALIDATE_PATHS
 fi
 
+. "$PROJECT_DIR/bin/mysqlConnection.inc" || exit 1
+
 # -------------------------------------------------------------------------- #
 
 # diretorio inicial
@@ -91,8 +93,8 @@ for linha in "${tuplas[@]}"; do
 
       echo
       echo "==== $index ==== [TIME-STAMP] `date '+%Y.%m.%d %H:%M:%S'`"
-      echo "bin/MySQL2Lucene.sh -mySqlHost=$mysqlserver -mySqlPort=$mysqlport -mySqlUser=$servername -mySqlPassword=$serverpassword -mySqlDbname=$serverdatabase -sqlfs=$sql1 -index=$index -schema=$schema -fieldToIndex=title -jsonFieldFile=conf/jsonFields.txt$split_document_field"
-      bin/MySQL2Lucene.sh -mySqlHost=$mysqlserver -mySqlPort=$mysqlport -mySqlUser=$servername -mySqlPassword=$serverpassword -mySqlDbname=$serverdatabase -sqls=$sql1 -index=$index -schema=$schema -fieldToIndex=title -jsonFieldFile=conf/jsonFields.txt $split_document_field
+      echo "bin/MySQL2Lucene.sh -mySqlHost=$mysqlserver -mySqlPort=$mysqlport -mySqlDbname=$serverdatabase -sqlfs=$sql1 -index=$index -schema=$schema -fieldToIndex=title -jsonFieldFile=conf/jsonFields.txt$split_document_field"
+      bin/MySQL2Lucene.sh -mySqlHost=$mysqlserver -mySqlPort=$mysqlport -mySqlDbname=$serverdatabase -sqls=$sql1 -index=$index -schema=$schema -fieldToIndex=title -jsonFieldFile=conf/jsonFields.txt $split_document_field
       ret="$?"
       if [ "$ret" -ne 0 ]; then
         sendemail -f appofi@bireme.org -u "DeDup Service - index creation ERROR - $(date '+%Y%m%d')" -m "DeDup Service - Erro na criacao do indice $index." -t appofi@bireme.org -cc barbieri@paho.org -s esmeralda.bireme.br
@@ -107,8 +109,8 @@ for linha in "${tuplas[@]}"; do
 
       echo
       echo "==== $index ===="
-      echo "bin/MySQL2Lucene.sh -mySqlHost=$mysqlserver -mySqlPort=$mysqlport -mySqlUser=$servername -mySqlPassword=$serverpassword -mySqlDbname=$serverdatabase -sqls=$sql1,$sql2 -index=$index -schema=$schema -fieldToIndex=title -jsonFieldFile=conf/jsonFields.txt$split_document_field"
-      bin/MySQL2Lucene.sh -mySqlHost=$mysqlserver -mySqlPort=$mysqlport -mySqlUser=$servername -mySqlPassword=$serverpassword -mySqlDbname=$serverdatabase -sqls=$sql1,$sql2 -index=$index -schema=$schema -fieldToIndex=title -jsonFieldFile=conf/jsonFields.txt $split_document_field
+      echo "bin/MySQL2Lucene.sh -mySqlHost=$mysqlserver -mySqlPort=$mysqlport -mySqlDbname=$serverdatabase -sqls=$sql1,$sql2 -index=$index -schema=$schema -fieldToIndex=title -jsonFieldFile=conf/jsonFields.txt$split_document_field"
+      bin/MySQL2Lucene.sh -mySqlHost=$mysqlserver -mySqlPort=$mysqlport -mySqlDbname=$serverdatabase -sqls=$sql1,$sql2 -index=$index -schema=$schema -fieldToIndex=title -jsonFieldFile=conf/jsonFields.txt $split_document_field
       ret="$?"
       if [ "$ret" -ne 0 ]; then
         sendemail -f appofi@bireme.org -u "DeDup Service - index creation ERROR - $(date '+%Y%m%d')" -m "DeDup Service - Erro na criacao do indice $index." -t appofi@bireme.org -cc barbieri@paho.org -s esmeralda.bireme.br

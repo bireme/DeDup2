@@ -17,6 +17,8 @@ elif [ -f ./dedup.inc ]; then
   unset DEDUP_VALIDATE_PATHS
 fi
 
-bin/MySQL2Lucene.sh -mySqlHost=$mysqlserver -mySqlPort=$mysqlport -mySqlUser=$servername -mySqlPassword=$serverpassword -mySqlDbname=$serverdatabase -sqlfs=sqls/LILACS_Sas_Source.sql -index=indexes/LILACS_Sas_Source_Five -fieldToIndex=title_serial -jsonFieldFile=conf/jsonFields.txt
+. bin/mysqlConnection.inc || exit 1
+
+bin/MySQL2Lucene.sh -mySqlHost=$mysqlserver -mySqlPort=$mysqlport -mySqlDbname=$serverdatabase -sqlfs=sqls/LILACS_Sas_Source.sql -index=indexes/LILACS_Sas_Source_Five -fieldToIndex=title_serial -jsonFieldFile=conf/jsonFields.txt
 
 cd - || exit

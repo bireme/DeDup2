@@ -1,8 +1,8 @@
 package dd
 
 import com.sun.net.httpserver.{HttpExchange, HttpServer}
-import dd.heuristics.{UrlIdentity, Util}
-import dd.interfaces.{CompResult, SimilarityStatus}
+import dd.heuristics.{LilacsSasHeuristic, UrlIdentity, Util}
+import dd.interfaces.{CompResult, Document, SimilarityStatus}
 import dd.interfaces.SimilarityStatus.{no, undefined, yes}
 
 import java.net.{InetSocketAddress, URI}
@@ -183,3 +183,16 @@ class UrlContentSuite extends munit.FunSuite:
     assert(!same("not a url", "not a url"))
     assert(!same("", s"$base/text/a"))
     assert(!Util.hasSameFinalUrl(results(s"$base/text/a", s"$base/text/a"), "other"))
+
+  test("LilacsSasHeuristic accepts different URLs that end at the same final URL"):
+    def heuristicResults(original: String, current: String): Seq[CompResult] =
+      Seq("title", "title_serial", "volume_serial", "issue_number", "author", "pages")
+        .map(name => CompResult("TestComparator", name, "value", "value", None, None, 1.0, yes)) :+
+        CompResult("UrlsComparator", field, original, current, None, None, 0.0, no) :+
+        CompResult("ExactComparator", "doi_number", "", "", None, None, 0.0, undefined)
+    def isDuplicated(original: String, current: String): Boolean =
+      new LilacsSasHeuristic().isDuplicated(Document(Seq("id" -> "2")), heuristicResults(original, current))
+
+    assert(isDuplicated(s"$base/old/x", s"$base/old/y"))
+    assert(!isDuplicated(s"$base/text/a", s"$base/text/b"))
+    assert(!isDuplicated(s"$base/home-redirect/1", s"$base/home-redirect/2"))

@@ -24,6 +24,44 @@ import scala.util.{Failure, Success, Try}
  * the codebase can stay focused on domain-specific processing.
  */
 object Tools:
+  /** Default field separator of the CSV files read and written by the tools. */
+  val DefaultCsvFieldSeparator: Char = '|'
+
+  /**
+   * Returns the value to show when logging a command-line parameter: secrets
+   * (names containing "password", or "pswd") are replaced by "***".
+   *
+   * @param name parameter name
+   * @param value parameter value
+   * @return the value itself, or "***" for secrets
+   */
+  def loggableParameter(name: String, value: String): String =
+    val lower: String = name.toLowerCase
+    if lower.contains("password") || lower == "pswd" then "***" else value
+
+  /** Credentials profile used when -credentials is not informed. */
+  val DefaultCredentialsProfile: String = "fiadmin"
+
+  /**
+   * Resolves the MySQL user and password of a command-line tool.
+   *
+   * -mySqlUser and -mySqlPassword, when informed, take precedence. Otherwise the
+   * values come from the credentials file (conf/credenciais.txt, or the path in
+   * the dedup.credentials property / DEDUP_CREDENTIALS variable), profile given
+   * by -credentials (default "fiadmin"). This keeps the password out of the
+   * command line and of the logs.
+   *
+   * @param parameters parsed command-line parameters
+   * @return MySQL user and password
+   */
+  def mySqlCredentials(parameters: Map[String, String]): Try[(String, String)] =
+    (parameters.get("mySqlUser"), parameters.get("mySqlPassword")) match
+      case (Some(user), Some(password)) => Success((user, password))
+      case (user, password) =>
+        val profile: String = parameters.get("credentials").filter(_.nonEmpty).getOrElse(DefaultCredentialsProfile)
+        dd.configurators.ConfMain.readCredentials(dd.configurators.ConfMain.credentialsFile, profile).map:
+          (fileUser, filePassword) => (user.getOrElse(fileUser), password.getOrElse(filePassword))
+
   /**
    * Parses command-line options, accepting arguments optionally surrounded by
    * matching single or double quotes.

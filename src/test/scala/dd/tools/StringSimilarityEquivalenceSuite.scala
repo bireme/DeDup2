@@ -121,7 +121,7 @@ class StringSimilarityEquivalenceSuite extends munit.FunSuite:
 
     val titles: Vector[String] =
       Using.resource(new FileReader(path.toFile, StandardCharsets.UTF_8)): reader =>
-        CSVFormat.DEFAULT.builder().setHeader().setSkipHeaderRecord(true).get()
+        CSVFormat.DEFAULT.builder().setDelimiter(Tools.DefaultCsvFieldSeparator).setHeader().setSkipHeaderRecord(true).get()
           .parse(reader).iterator().asScala
           .map(_.get("title_monographic"))
           .filter(title => title != null && title.nonEmpty)

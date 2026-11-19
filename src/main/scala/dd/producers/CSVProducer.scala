@@ -1,6 +1,7 @@
 package dd.producers
 
 import dd.interfaces.{DocsProducer, Document}
+import dd.tools.Tools
 import org.apache.commons.csv.{CSVFormat, CSVParser, CSVRecord}
 
 import java.io.{Reader, StringReader}
@@ -22,13 +23,13 @@ import scala.util.{Failure, Success, Try, Using}
  * @param csv CSV file path or direct CSV content
  * @param schema mapping between CSV column positions and document field names
  * @param hasHeader true when the first CSV record contains column names
- * @param fieldSeparator character used to separate CSV fields
+ * @param fieldSeparator character used to separate CSV fields (default '|')
  * @param csvFileEncoding character encoding used when `csv` is a file path
  */
 class CSVProducer(csv: String,
                   schema: Map[Int,String],
                   hasHeader: Boolean,
-                  fieldSeparator: Char =',',
+                  fieldSeparator: Char = Tools.DefaultCsvFieldSeparator,
                   csvFileEncoding: String = "utf-8") extends DocsProducer:
   /**
    * Returns the produced documents.

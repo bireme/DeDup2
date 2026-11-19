@@ -1,0 +1,9 @@
+# Credenciais do MySQL (ver conf/credenciais.txt.example)
+conf/credenciais.txt
+
+# Arquivos gerados por bin/startServices.sh
+server/services.pid
+server/services.log
+
+# Configuração local com credenciais
+dedup.inc*

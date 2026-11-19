@@ -24,8 +24,10 @@ object SQL2Json:
       |options:
       |	-mySqlHost=<host>       MySQL server host address
       |	-mySqlPort=<int>        MySQL server port
-      |	-mySqlUser=<str>        MySQL database user
-      |	-mySqlPassword=<str>    MySQL database password
+      |	[-mySqlUser=<str>]      MySQL database user. Default: read from the credentials file.
+      |	[-mySqlPassword=<str>]  MySQL database password. Default: read from the credentials file.
+      |	[-credentials=<name>]   Profile of conf/credenciais.txt (or of the file in DEDUP_CREDENTIALS)
+      |	                        used when -mySqlUser/-mySqlPassword are absent. Default is 'fiadmin'.
       |	-mySqlDbname=<str>      MySQL database name
       |	-sqlfs=<name1>[,...,<nameN>] Comma-separated SQL statement files to execute sequentially.
       |	                        Results from each file are appended to the same output JSON array during this run.
@@ -57,7 +59,8 @@ object SQL2Json:
   private def run(args: Array[String]): Try[Unit] =
     for
       parameters <- parseArgs(args)
-      _ <- requireParameters(parameters, "mySqlHost", "mySqlPort", "mySqlUser", "mySqlPassword", "mySqlDbname", "sqlfs", "outJsonFile")
+      _ <- requireParameters(parameters, "mySqlHost", "mySqlPort", "mySqlDbname", "sqlfs", "outJsonFile")
+      (mySqlUser, mySqlPassword) <- Tools.mySqlCredentials(parameters)
       _ = logParameters(parameters)
       jFields <- parseJsonFieldMapping(parameters.get("jsonFieldFile"))
       sqlFiles <- Tools.parseSqlFileList(parameters("sqlfs"))
@@ -65,8 +68,8 @@ object SQL2Json:
         mySqlHost = parameters("mySqlHost"),
         mySqlPort = parameters("mySqlPort").toInt,
         mySqlDbname = parameters("mySqlDbname"),
-        mySqlUser = parameters("mySqlUser"),
-        mySqlPassword = parameters("mySqlPassword"),
+        mySqlUser = mySqlUser,
+        mySqlPassword = mySqlPassword,
         sqlfs = sqlFiles,
         sqlEncoding = parameters.getOrElse("sqlEncoding", "utf-8"),
         jsonFields = jFields,
@@ -106,7 +109,7 @@ object SQL2Json:
    */
   private def logParameters(parameters: Map[String, String]): Unit =
     println("Parameters:")
-    parameters.foreach(param => println(s"\t${param._1}=${param._2}"))
+    parameters.foreach((name, value) => println(s"\t$name=${Tools.loggableParameter(name, value)}"))
     println()
 
   /**
