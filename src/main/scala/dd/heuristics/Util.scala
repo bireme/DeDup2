@@ -136,6 +136,7 @@ object Util:
       val originalUrls: Seq[String] = splitUrls(result.originalField)
       val currentUrls: Seq[String] = splitUrls(result.currentField)
 
+      println("==> hasSameFinalUrl")
       originalUrls.nonEmpty && currentUrls.nonEmpty && {
         lazy val currentAddresses: Seq[(String, Int, String)] =
           currentUrls.flatMap(UrlIdentity.finalUri).map(address)

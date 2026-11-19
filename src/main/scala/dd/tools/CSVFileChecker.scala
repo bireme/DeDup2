@@ -1,6 +1,6 @@
 package dd.tools
 
-import scala.annotation.{tailrec, unused}
+import scala.annotation.tailrec
 import scala.io.Source
 import scala.util.{Failure, Success, Try, Using}
 
@@ -24,9 +24,7 @@ object CSVFileChecker:
       |	-csvFile=<path>          Path to the comma separated value file (csv)
       |	-numberOfFields=<num>    Number of fields in each line of the csv file
       |	[-fieldSeparator=<char>] Character indication the field separator. Default value is '|'.
-      |	[-encoding=<str>]        The csv character encoding. Default value is 'utf-8'
-      |	[-reportFile=<path>]     Path to an output file having the check results. Default behaviour is to print the results to the standard output
-      |	[-stopAfter=<num>]       Stop checking after <num> errors were found. Defeault behaviour is to check until the end of the input file.""".stripMargin
+      |	[-encoding=<str>]        The csv character encoding. Default value is 'utf-8'""".stripMargin
 
   /**
    * Entry point used when the utility is executed from the command line.
@@ -54,9 +52,7 @@ object CSVFileChecker:
         parameters("csvFile"),
         parameters("numberOfFields").toInt,
         parameters.get("fieldSeparator").map(_.trim).flatMap(_.headOption).getOrElse(Tools.DefaultCsvFieldSeparator),
-        parameters.getOrElse("encoding", "utf-8"),
-        parameters.getOrElse("stopAfter", Integer.MAX_VALUE.toString).toInt,
-        parameters.get("reportFile")
+        parameters.getOrElse("encoding", "utf-8")
       )
     yield ()
 
@@ -99,19 +95,15 @@ object CSVFileChecker:
    * @param numberOfFields expected number of fields per record
    * @param fieldSeparator field separator used in the CSV input
    * @param encoding character encoding used to read the input file
-   * @param stopAfter value of stop after
    * @return result of processing the CSV file
    */
   private def processFile(csvFile: String,
                           numberOfFields: Int,
                           fieldSeparator: Char,
-                          encoding: String,
-                          stopAfter: Int,
-                          @unused reportFile: Option[String]): Try[Unit] =
+                          encoding: String): Try[Unit] =
     Using(Source.fromFile(csvFile, encoding)):
       source =>
       require(numberOfFields > 0, "numberOfFields parameter should be a positive number")
-      require(stopAfter > 0, "stopAfter parameter should be a positive number")
 
       val lines: Iterator[String] = source.getLines()
 

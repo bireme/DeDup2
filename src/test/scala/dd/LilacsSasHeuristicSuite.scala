@@ -64,8 +64,8 @@ class LilacsSasHeuristicSuite extends munit.FunSuite:
     assert(isDuplicated(results(undefined, Map("title_serial" -> undefined))))
 
   test("default SAS heuristic without a similar URL or DOI allows at most one different result"):
-    assert(isDuplicated(results(undefined, Map("pages" -> no))))
-    assert(!isDuplicated(results(undefined, Map("pages" -> no, "author" -> no))))
+    assert(isDuplicated(results(undefined, Map("issue_number" -> no))))
+    assert(!isDuplicated(results(undefined, Map("issue_number" -> no, "author" -> no))))
     assert(!isDuplicated(results(undefined, Map("pages" -> no), doiStatus = no)))
     assert(!isDuplicated(results(no, Map("pages" -> no))))
 
@@ -75,8 +75,10 @@ class LilacsSasHeuristicSuite extends munit.FunSuite:
     // Only the title is filled: there is no minimum number of similar results.
     assert(isDuplicated(results(undefined, bibliographic.map(_ -> undefined).toMap)))
 
-  test("identical titles without URL and DOI: one difference requires every bibliographic field"):
+  test("identical titles without URL and DOI: one difference requires every bibliographic field and similar pages"):
     assert(isDuplicated(results(undefined, Map("issue_number" -> no))))
+    // The only difference is in the pages.
+    assert(!isDuplicated(results(undefined, Map("pages" -> no))))
     // Records 7592 and 7595: issue different and pages empty.
     assert(!isDuplicated(results(undefined, Map("issue_number" -> no, "pages" -> undefined))))
     assert(!isDuplicated(results(undefined, Map("issue_number" -> no, "author" -> undefined))))

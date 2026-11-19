@@ -37,8 +37,8 @@ class LilacsSasHeuristic extends Heuristics:
    *       - if the titles are identical (similarity 1.0, see {@code ~=}):
    *         either no result is different (empty fields are accepted), or
    *         no field other than URL and DOI is empty (journal title, volume,
-   *         issue, author and pages are all filled), so that only one of them
-   *         differs;
+   *         issue, author and pages are all filled) and the pages are
+   *         similar, so that only one of the other fields differs;
    *       - otherwise (similar but not identical titles): no result may be
    *         different, at most one field other than URL and DOI may be empty
    *         and the pages must be similar. Parts of the same article ("I. Parte" and
@@ -82,8 +82,9 @@ class LilacsSasHeuristic extends Heuristics:
           if urlStatus == undefined && doiStatus == undefined then
             if similarity(results, titleField) ~= 1.0 then
               // No field is 'no' (empty fields allowed), or no field is empty:
-              // every field is filled and at most one is 'no'.
-              (differentFieldCount == 0) || (undefinedFieldCount == 0)
+              // every field is filled, the pages are 'yes' and at most one
+              // other field is 'no'.
+              (differentFieldCount == 0) || ((undefinedFieldCount == 0) && (getStatus(pageField, resultMap) == yes))
             else
               // No field is 'no', at most one field is empty and the pages
               // are 'yes'.
