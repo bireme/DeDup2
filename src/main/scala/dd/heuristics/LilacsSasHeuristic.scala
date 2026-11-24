@@ -69,10 +69,11 @@ class LilacsSasHeuristic extends Heuristics:
       val doiStatus = getStatus(doiField, resultMap)
       lazy val urlStatus = getStatus(urlField, resultMap)
       lazy val authorStatus = getStatus(authorField, resultMap)
+      lazy val differentFieldCount: Int = resultMap.count((_, status) => status == no)
 
       if doiStatus == yes then true
       else if doiStatus == no then false
-      else if urlStatus == yes && authorStatus == yes then true
+      else if urlStatus == yes && authorStatus == yes && differentFieldCount == 0 then true
       else
         //val similarFieldCount: Int = resultMap.count((_, status) => status == yes)
         // Empty fields: URL and DOI are left out, so the count does not depend
@@ -80,7 +81,6 @@ class LilacsSasHeuristic extends Heuristics:
         val undefinedFieldCount: Int = resultMap.count((fld, status) =>
           status == undefined && fld != urlField && fld != doiField)
         // Different fields: the DOI is undefined here, a different URL counts.
-        val differentFieldCount: Int = resultMap.count((_, status) => status == no)
         val maxNoConditions: Int = 1
 
         (differentFieldCount <= maxNoConditions) && {
