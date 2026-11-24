@@ -19,6 +19,12 @@ import scala.util.{Failure, Success, Try, Using}
  * The implementation expands author occurrences, normalizes naming variants,
  * and then compares the author sequences using similarity heuristics tailored
  * to abbreviated names and reordered author strings.
+ *
+ * The lists are similar when their sizes are compatible (see
+ * {@link AuthorsComparator.compatibleSizes}) and every author of the shorter
+ * list has a similar author in the other list, except for at most
+ * {@link AuthorsComparator.maxUnmatchedAuthors} of them (one when the shorter
+ * list has four or more authors).
  */
 class AuthorsComparator(fieldName: String,
                         occSeparator: String = "//@//") extends Comparator:
@@ -98,7 +104,11 @@ class AuthorsComparator(fieldName: String,
       if !AuthorsComparator.compatibleSizes(fromSeq.length, toSeq.length) then
         buildResult(score = 0, status = SimilarityStatus.no)
       else
-        val isSimilar: Boolean = fromSeq.forall(existSimilar(_, toSeq))
+        // Authors of the shorter list without a similar author in the other
+        // list; counting stops as soon as the limit is exceeded.
+        val maxUnmatched: Int = AuthorsComparator.maxUnmatchedAuthors(fromSeq.length)
+        val unmatched: Int = fromSeq.iterator.filterNot(existSimilar(_, toSeq)).take(maxUnmatched + 1).size
+        val isSimilar: Boolean = unmatched <= maxUnmatched
         val status = if isSimilar then SimilarityStatus.yes else SimilarityStatus.no
         buildResult(score = if isSimilar then 1 else 0, status = status)
 
@@ -241,6 +251,22 @@ object AuthorsComparator:
    */
   private[dd] def compatibleSizes(shorterSize: Int, longerSize: Int): Boolean =
     shorterSize <= longerSize && longerSize <= (3 * shorterSize + 1) / 2
+
+  /** Minimum size of the shorter list for one of its authors to be left unmatched. */
+  private[dd] val MinAuthorsToTolerateUnmatched: Int = 4
+
+  /**
+   * Number of authors of the shorter list that may have no similar author in
+   * the other list. Long lists tolerate one unmatched author, which covers a
+   * corrupted or misspelled name (for example "hzabethzabethzabeth" for
+   * "Romagosa, Elizabeth"); short lists must match completely.
+   *
+   * @param shorterSize number of authors of the shorter list
+   * @return 1 when the shorter list has at least
+   *         {@code MinAuthorsToTolerateUnmatched} authors, 0 otherwise
+   */
+  private[dd] def maxUnmatchedAuthors(shorterSize: Int): Int =
+    if shorterSize >= MinAuthorsToTolerateUnmatched then 1 else 0
 
   /**
    * Prints the command usage information and exits.

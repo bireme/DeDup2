@@ -850,7 +850,8 @@ object ConfMain:
     val map: collection.Map[String, JsValue] = json.value
     new UrlsComparator(
       fieldName = requiredString(map, "fieldName"),
-      occSeparator = optionalString(map, "occSeparator").getOrElse("//@//")
+      occSeparator = optionalString(map, "occSeparator").getOrElse(UrlsComparator.DefaultOccSeparator),
+      followRedirects = !map.contains("followRedirects") || requiredBoolean(map, "followRedirects")
     )
 
   /**

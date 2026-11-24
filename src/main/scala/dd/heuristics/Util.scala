@@ -2,7 +2,6 @@ package dd.heuristics
 
 import dd.interfaces.{CompResult, SimilarityStatus}
 
-import java.net.URI
 import scala.util.Try
 
 /** Shared comparison helpers used by document heuristics. */
@@ -113,44 +112,6 @@ object Util:
         if originalUrls.isEmpty || currentUrls.isEmpty then SimilarityStatus.undefined
         else UrlIdentity.status(originalUrls, currentUrls)
       case None => SimilarityStatus.undefined
-
-  /**
-   * Returns whether the URLs of a comparator field end, after following their
-   * redirects, at the same address: same host (ignoring case), port (the
-   * scheme default when absent) and path. The query and the fragment are not
-   * compared. When a field holds several URLs separated by {@code //@//}, any
-   * original URL ending at the same address as any current URL is enough.
-   *
-   * Downloads are shared with {@link UrlIdentity} (same cache, retries and
-   * request spacing).
-   *
-   * @param results comparator results to search
-   * @param fieldName comparator field name
-   * @return {@code true} when both final addresses are known and equal;
-   *         {@code false} when a value is empty, a URL is invalid or
-   *         unreachable, does not answer with a 2xx status, ends at the root
-   *         of a site, or the final addresses differ
-   */
-  def hasSameFinalUrl(results: Seq[CompResult], fieldName: String): Boolean =
-    results.find(_.fieldName == fieldName).exists: result =>
-      val originalUrls: Seq[String] = splitUrls(result.originalField)
-      val currentUrls: Seq[String] = splitUrls(result.currentField)
-
-      println("==> hasSameFinalUrl")
-      originalUrls.nonEmpty && currentUrls.nonEmpty && {
-        lazy val currentAddresses: Seq[(String, Int, String)] =
-          currentUrls.flatMap(UrlIdentity.finalUri).map(address)
-
-        originalUrls.iterator.flatMap(UrlIdentity.finalUri).map(address).exists(currentAddresses.contains)
-      }
-
-  /** Host (lower case), port (scheme default when absent) and path of a URI. */
-  private def address(uri: URI): (String, Int, String) =
-    val port: Int =
-      if uri.getPort >= 0 then uri.getPort
-      else if "https".equalsIgnoreCase(uri.getScheme) then 443
-      else 80
-    (Option(uri.getHost).getOrElse("").toLowerCase, port, Option(uri.getPath).getOrElse(""))
 
   /** Splits a field value into its non-empty URL occurrences. */
   private def splitUrls(value: String): Seq[String] =

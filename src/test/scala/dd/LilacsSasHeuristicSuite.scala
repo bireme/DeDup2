@@ -27,7 +27,8 @@ class LilacsSasHeuristicSuite extends munit.FunSuite:
 
   /**
    * Creates one comparator result for the requested field and status. The
-   * values are not URLs, so the URL content check never downloads anything.
+   * heuristic only reads the statuses and the title similarity; it never
+   * accesses the network (the URL comparator does).
    */
   private def result(fieldName: String, status: SimilarityStatus): CompResult =
     CompResult("TestComparator", fieldName, "value", "value", None, None,
@@ -52,30 +53,50 @@ class LilacsSasHeuristicSuite extends munit.FunSuite:
   /** Similarity of the titles of records 41320 and 41321 ("I. Parte" and "II parte"). */
   private val partTitleSimilarity: Double = 80.0 / 81.0
 
-  test("default SAS heuristic accepts a similar URL or DOI regardless of the other results"):
-    assert(isDuplicated(results(yes, Map("title" -> no, "title_serial" -> no, "author" -> no))))
+  test("default SAS heuristic: a similar DOI is enough, whatever the other results"):
     assert(isDuplicated(results(undefined, bibliographic.map(_ -> undefined).toMap + ("title" -> no),
       doiStatus = yes)))
-    assert(isDuplicated(results(yes, doiStatus = no)))
-    assert(isDuplicated(results(no, doiStatus = yes)))
+    assert(isDuplicated(results(no, Map("title" -> no, "author" -> no), doiStatus = yes)))
+
+  test("default SAS heuristic: a different DOI rejects the pair, whatever the other results"):
+    assert(!isDuplicated(results(yes, doiStatus = no)))
+    assert(!isDuplicated(results(undefined, doiStatus = no)))
+    assert(!isDuplicated(results(no, doiStatus = no)))
+
+  test("default SAS heuristic: similar URLs and similar authors are enough"):
+    assert(isDuplicated(results(yes, Map("title" -> no, "title_serial" -> no, "pages" -> no))))
+    // Different authors: the URL does not help and the other results decide.
+    assert(!isDuplicated(results(yes, Map("title" -> no, "title_serial" -> no, "author" -> no))))
+    assert(isDuplicated(results(yes, Map("author" -> no))))
+    assert(!isDuplicated(results(yes, Map("author" -> no), titleSimilarity = 0.9)))
+    assert(isDuplicated(results(yes, Map("author" -> undefined), titleSimilarity = 0.9)))
 
   test("default SAS heuristic does not require similar journal titles"):
     assert(isDuplicated(results(undefined, Map("title_serial" -> no))))
     assert(isDuplicated(results(undefined, Map("title_serial" -> undefined))))
 
-  test("default SAS heuristic without a similar URL or DOI allows at most one different result"):
+  test("default SAS heuristic without a similar DOI or URL allows at most one different result"):
     assert(isDuplicated(results(undefined, Map("issue_number" -> no))))
     assert(!isDuplicated(results(undefined, Map("issue_number" -> no, "author" -> no))))
-    assert(!isDuplicated(results(undefined, Map("pages" -> no), doiStatus = no)))
     assert(!isDuplicated(results(no, Map("pages" -> no))))
 
-  test("identical titles without URL and DOI: no difference accepts empty bibliographic fields"):
+  test("default SAS heuristic counts a different URL as one difference"):
+    // Identical titles, every other field filled and similar pages: the URL is
+    // the only difference allowed.
+    assert(isDuplicated(results(no)))
+    assert(!isDuplicated(results(no, Map("issue_number" -> no))))
+    assert(!isDuplicated(results(no, Map("pages" -> undefined))))
+    assert(!isDuplicated(results(no, bibliographic.map(_ -> undefined).toMap)))
+    // Similar titles allow no difference.
+    assert(!isDuplicated(results(no, titleSimilarity = 0.9)))
+
+  test("identical titles without DOI and URL: no difference accepts empty bibliographic fields"):
     assert(isDuplicated(results(undefined)))
     assert(isDuplicated(results(undefined, Map("pages" -> undefined))))
     // Only the title is filled: there is no minimum number of similar results.
     assert(isDuplicated(results(undefined, bibliographic.map(_ -> undefined).toMap)))
 
-  test("identical titles without URL and DOI: one difference requires every bibliographic field and similar pages"):
+  test("identical titles without DOI and URL: one difference requires every bibliographic field and similar pages"):
     assert(isDuplicated(results(undefined, Map("issue_number" -> no))))
     // The only difference is in the pages.
     assert(!isDuplicated(results(undefined, Map("pages" -> no))))
@@ -83,7 +104,7 @@ class LilacsSasHeuristicSuite extends munit.FunSuite:
     assert(!isDuplicated(results(undefined, Map("issue_number" -> no, "pages" -> undefined))))
     assert(!isDuplicated(results(undefined, Map("issue_number" -> no, "author" -> undefined))))
 
-  test("similar titles without URL and DOI: no difference, at most one empty field and similar pages"):
+  test("similar titles without DOI and URL: no difference, at most one empty field and similar pages"):
     assert(isDuplicated(results(undefined, titleSimilarity = 0.9)))
     assert(isDuplicated(results(undefined, Map("author" -> undefined), titleSimilarity = 0.9)))
     assert(isDuplicated(results(undefined, Map("title_serial" -> undefined), titleSimilarity = 0.9)))
@@ -92,7 +113,7 @@ class LilacsSasHeuristicSuite extends munit.FunSuite:
     assert(!isDuplicated(results(undefined, Map("issue_number" -> no), titleSimilarity = 0.9)))
     assert(!isDuplicated(results(undefined, Map("pages" -> no), titleSimilarity = 0.9)))
 
-  test("similar titles without URL and DOI: empty pages are rejected (records 41320 and 41321)"):
+  test("similar titles without DOI and URL: empty pages are rejected (records 41320 and 41321)"):
     assert(!isDuplicated(results(undefined, Map("pages" -> undefined), titleSimilarity = partTitleSimilarity)))
     assert(isDuplicated(results(undefined, titleSimilarity = partTitleSimilarity)))
 
@@ -130,15 +151,6 @@ class LilacsSasHeuristicSuite extends munit.FunSuite:
       val withComparators: Seq[CompResult] = results(undefined, overrides, titleSimilarity)
       assertEquals(isDuplicated(withoutUrlAndDoi(withComparators)), isDuplicated(withComparators),
         s"$overrides, title similarity $titleSimilarity")
-
-  test("default SAS heuristic with a different URL or DOI requires the same final URL"):
-    // "value" is not a URL, so the final URL check fails without accessing the network.
-    assert(!isDuplicated(results(no)))
-    assert(!isDuplicated(results(no, bibliographic.map(_ -> undefined).toMap)))
-    // An undefined URL never has the same final URL.
-    assert(!isDuplicated(results(undefined, doiStatus = no)))
-    // Different URL and DOI: two differences.
-    assert(!isDuplicated(results(no, doiStatus = no)))
 
   test("weak2 SAS heuristic requires exactly one false condition with identical titles"):
     val noFailure = results(yes)

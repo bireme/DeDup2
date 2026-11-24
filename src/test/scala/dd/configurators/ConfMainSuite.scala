@@ -130,6 +130,22 @@ class ConfMainSuite extends munit.FunSuite:
     assertEquals(result.isSimilar, SimilarityStatus.yes)
     assertEquals(result.similarity, 1.0)
 
+  test("parseSimilarityConfig reads followRedirects of the URLs comparator"):
+    def config(options: String): String =
+      s"""{
+        |  "finder": { "lucene": { "searchField": "title", "minSimilarity": 0.8 } },
+        |  "comparators": [ { "urls": { "fieldName": "link"$options } } ]
+        |}""".stripMargin
+
+    // Local URLs that cannot be reached: with followRedirects false the
+    // network is never accessed and the different paths give 'no'.
+    val (_, comparators) = ConfMain.parseSimilarityConfig(config(""", "followRedirects": false"""))
+    val result = comparators.head.compare(Document(Seq("link" -> "http://127.0.0.1:9/a")),
+      Document(Seq("link" -> "http://127.0.0.1:9/b")))
+    assertEquals(result.isSimilar, SimilarityStatus.no)
+
+    intercept[IllegalArgumentException](ConfMain.parseSimilarityConfig(config(""", "followRedirects": "yes"""")))
+
   test("parseSimilarityConfig accepts DOI comparator"):
     val config =
       """{

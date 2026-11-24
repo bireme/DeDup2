@@ -125,7 +125,7 @@ class PreparedComparatorSuite extends munit.FunSuite:
       Document(Seq("link" -> "https://www.bireme.br/a?x=1")),
       Document(Seq("link" -> "http://example.org/b"))
     )
-    val urlsComparator = UrlsComparator("link")
+    val urlsComparator = UrlsComparator("link", followRedirects = false)
     for original <- urls; current <- urls do
       assertEquals(urlsComparator.prepare(original).compare(current), urlsComparator.compare(original, current))
 

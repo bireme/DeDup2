@@ -108,6 +108,31 @@ class ComparatorsSuite extends munit.FunSuite:
     assertEquals(compare(four, three), SimilarityStatus.yes)
     assertEquals(compare(three, six), SimilarityStatus.no)
 
+  test("AuthorsComparator tolerates one unmatched author when the shorter list has four or more"):
+    val comparator = new AuthorsComparator("authors")
+    def compare(left: String, right: String) =
+      comparator.compare(Document(Seq("authors" -> left)), Document(Seq("authors" -> right))).isSimilar
+
+    // Real case: "Romagosa, Elizabeth" was stored as "hzabethzabethzabeth" (Dice 0.435).
+    val original = "Dias, Danielle de Carla//@//Ranzani-Paiva, Maria José Tavares//@//Romagosa, Elizabeth" +
+      "//@//Santos, Antenor Aguiar//@//Seriani, Robson//@//Tachibana, Leonardo"
+    val corrupted = "Aguiar Santos, Antenor//@//de Carla Dias, Danielle//@//hzabethzabethzabeth" +
+      "//@//José Tavares Ranzani-Paiva, Maria//@//Seriani, Robson//@//Tachibana, Leonardo"
+    assertEquals(compare(original, corrupted), SimilarityStatus.yes)
+    assertEquals(compare(corrupted, original), SimilarityStatus.yes)
+
+    val four = "Silva, Joao//@//Souza, Maria//@//Costa, Pedro//@//Lima, Ana"
+    assertEquals(compare(four, "Silva, Joao//@//Souza, Maria//@//Costa, Pedro//@//Barbosa, Ricardo"), SimilarityStatus.yes)
+    // Two unmatched authors are too many.
+    assertEquals(compare(four, "Silva, Joao//@//Souza, Maria//@//Ferreira, Tiago//@//Barbosa, Ricardo"), SimilarityStatus.no)
+    // Three authors must all match.
+    assertEquals(compare("Silva, Joao//@//Souza, Maria//@//Costa, Pedro",
+      "Silva, Joao//@//Souza, Maria//@//Barbosa, Ricardo"), SimilarityStatus.no)
+
+    assertEquals(AuthorsComparator.maxUnmatchedAuthors(3), 0)
+    assertEquals(AuthorsComparator.maxUnmatchedAuthors(4), 1)
+    assertEquals(AuthorsComparator.maxUnmatchedAuthors(10), 1)
+
   test("NGramComparator reports Dice result after ngram passes threshold"):
     val comparator = new NGramComparator("title", normalize = false, minSimilarity = 0.55)
     val left = Document(Seq("title" -> "aaaaaa"))
@@ -120,7 +145,7 @@ class ComparatorsSuite extends munit.FunSuite:
     assertEquals(result.isSimilar, SimilarityStatus.yes)
 
   test("UrlsComparator compares decoded URLs and reports raw and decoded values"):
-    val comparator = new UrlsComparator("link")
+    val comparator = new UrlsComparator("link", followRedirects = false)
     val encodedUrl = "http%3A%2F%2Fexample.org%2Farticle%3Fid%3D123"
     val decodedUrl = "http://example.org/article?id=123"
 
@@ -137,7 +162,7 @@ class ComparatorsSuite extends munit.FunSuite:
     assertEquals(result.currentFieldOther, Some(decodedUrl))
 
   test("UrlsComparator reads pid from HTML-escaped URLs"):
-    val comparator = new UrlsComparator("link")
+    val comparator = new UrlsComparator("link", followRedirects = false)
     val scielo = "http://old.scielo.br/scielo.php?script=sci_arttext&amp;pid=S1519-698420040%s00001&amp;lng=en&amp;nrm=iso&amp;tlng=en"
 
     def compare(original: String, current: String) =
@@ -149,7 +174,7 @@ class ComparatorsSuite extends munit.FunSuite:
     assertEquals(compare(scielo.format("03"), scielo.format("03").replace("&amp;", "&amp;amp;")), SimilarityStatus.yes)
 
   test("UrlsComparator tolerates quotes and illegal characters"):
-    val comparator = new UrlsComparator("link")
+    val comparator = new UrlsComparator("link", followRedirects = false)
     val url = "http://old.scielo.br/scielo.php?script=sci_arttext&pid=S1519-69842004000%s00001&lng=en&tlng=en"
 
     def compare(original: String, current: String) =
@@ -166,6 +191,45 @@ class ComparatorsSuite extends munit.FunSuite:
     assertEquals(UrlsComparator.cleanUrl("http://h/p?a=1%22"), "http://h/p?a=1")
     assertEquals(UrlsComparator.cleanUrl("http://h/p?q=a b"), "http://h/p?q=a%20b")
     assertEquals(UrlsComparator.cleanUrl("http://h/p?q=100%"), "http://h/p?q=100%")
+
+  test("UrlsComparator.sameUrl: host ignoring case, default ports, id/pid or path"):
+    def same(original: String, current: String): Boolean =
+      UrlsComparator.sameUrl(UrlsComparator.toUrlElement(original).get, UrlsComparator.toUrlElement(current).get)
+
+    assert(same("http://Example.ORG/a", "http://example.org/a"))
+    // http and https, explicit or implicit default ports.
+    assert(same("http://example.org/a", "https://example.org/a"))
+    assert(same("https://example.org:443/a", "http://example.org/a"))
+    assert(!same("http://example.org:8080/a", "http://example.org/a"))
+    assert(!same("http://example.org/a", "http://example.com/a"))
+    // Without id/pid the path decides; other parameters are ignored.
+    assert(same("http://example.org/a?lang=pt", "http://example.org/a?lang=en#top"))
+    assert(!same("http://example.org/a", "http://example.org/b"))
+    // With id/pid the parameter decides, even on the same path.
+    assert(same("http://example.org/a.php?pid=1", "http://example.org/b.php?pid=1"))
+    assert(!same("http://example.org/scielo.php?pid=1", "http://example.org/scielo.php?pid=2"))
+    assert(!same("http://example.org/scielo.php?pid=1", "http://example.org/scielo.php"))
+
+  test("UrlsComparator splits occurrences with a literal separator and reads repeated fields"):
+    val comparator = new UrlsComparator("link", occSeparator = "|", followRedirects = false)
+    def compare(original: Document, current: Document) = comparator.compare(original, current)
+
+    val split = compare(Document(Seq("link" -> "http://example.org/x|http://example.org/a")),
+      Document(Seq("link" -> "http://example.org/a")))
+    assertEquals(split.isSimilar, SimilarityStatus.yes)
+    assertEquals(split.originalField, "http://example.org/a")
+
+    val repeated = compare(Document(Seq("link" -> "http://example.org/x", "link" -> "http://example.org/a")),
+      Document(Seq("link" -> "http://example.org/a")))
+    assertEquals(repeated.isSimilar, SimilarityStatus.yes)
+
+    val different = compare(Document(Seq("link" -> "http://example.org/x|http://example.org/y")),
+      Document(Seq("link" -> "http://example.org/a")))
+    assertEquals(different.isSimilar, SimilarityStatus.no)
+    assertEquals(different.originalField, "http://example.org/x|http://example.org/y")
+    // Values without a valid URL are undefined.
+    assertEquals(compare(Document(Seq("link" -> "not a url")), Document(Seq("link" -> "http://example.org/a"))).isSimilar,
+      SimilarityStatus.undefined)
 
   test("NumberComparator extracts the first numeric match"):
     val comparator = new NumberComparator("volume", regex = "\\d+")
@@ -222,7 +286,7 @@ class ComparatorsSuite extends munit.FunSuite:
       new JaccardComparator("missing", normalize = false, minSimilarity = 0.0),
       new LevenshteinJaccardComparator("missing", normalize = false, minSimilarity = 0.0),
       new AuthorsComparator("authors"),
-      new UrlsComparator("link"),
+      new UrlsComparator("link", followRedirects = false),
       new DoiComparator("missing")
     )
 

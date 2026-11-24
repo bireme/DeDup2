@@ -1,6 +1,7 @@
 package dd
 
 import com.sun.net.httpserver.{HttpExchange, HttpServer}
+import dd.comparators.{UrlElement, UrlsComparator}
 import dd.heuristics.{LilacsSasHeuristic, UrlIdentity, Util}
 import dd.interfaces.{CompResult, Document, SimilarityStatus}
 import dd.interfaces.SimilarityStatus.{no, undefined, yes}
@@ -163,33 +164,55 @@ class UrlContentSuite extends munit.FunSuite:
     assert(Util.isUrlContentSimilar(results(s"$base/text/a", s"$base/text/b"), field))
     assert(!Util.isUrlContentSimilar(results(s"$base/text/a", s"$base/text/c"), field))
 
-  // hasSameFinalUrl: host, port and path after redirects.
+  // hasSameFinalUrl: the rule of sameUrl applied after the redirects.
 
-  test("hasSameFinalUrl compares host, port and path after redirects"):
-    def same(original: String, current: String): Boolean = Util.hasSameFinalUrl(results(original, current), field)
+  private def element(url: String): UrlElement = UrlsComparator.toUrlElement(url).get
+
+  test("hasSameFinalUrl applies sameUrl to the final URLs"):
+    def same(original: String, current: String): Boolean =
+      UrlsComparator.hasSameFinalUrl(element(original), element(current))
 
     assert(same(s"$base/old/x", s"$base/old/y"))
     assert(same(s"$base/old/x", s"$base/final"))
     assert(same(s"$base/text/a?lang=pt&x=1", s"$base/text/a?x=2#top"))
-    assert(same(s"$base/missing//@//$base/old/x", s"$base/final"))
     assert(!same(s"$base/text/a", s"$base/text/b"))
     assert(!same(s"$base/text/a", s"http://localhost:${server().getAddress.getPort}/text/a/"))
 
-  test("hasSameFinalUrl is false for home-page redirects, unavailable URLs and empty values"):
-    def same(original: String, current: String): Boolean = Util.hasSameFinalUrl(results(original, current), field)
+  test("hasSameFinalUrl is false for home-page redirects and unavailable URLs"):
+    def same(original: String, current: String): Boolean =
+      UrlsComparator.hasSameFinalUrl(element(original), element(current))
 
     assert(!same(s"$base/home-redirect/1", s"$base/home-redirect/2"))
     assert(!same(s"$base/missing", s"$base/missing"))
-    assert(!same("not a url", "not a url"))
-    assert(!same("", s"$base/text/a"))
-    assert(!Util.hasSameFinalUrl(results(s"$base/text/a", s"$base/text/a"), "other"))
+
+  // UrlsComparator: stored URLs first, final URLs as a last resort.
+
+  private def compareUrls(original: String, current: String, followRedirects: Boolean = true): CompResult =
+    new UrlsComparator(field, followRedirects = followRedirects)
+      .compare(Document(Seq(field -> original)), Document(Seq(field -> current)))
+
+  test("UrlsComparator follows the redirects only when the stored URLs differ"):
+    val redirected = compareUrls(s"$base/old/x", s"$base/old/y")
+    assertEquals(redirected.isSimilar, yes)
+    assertEquals(redirected.originalField, s"$base/old/x")
+    assertEquals(compareUrls(s"$base/old/x", s"$base/old/y", followRedirects = false).isSimilar, no)
+    // Any pair of occurrences may end at the same document.
+    assertEquals(compareUrls(s"$base/missing//@//$base/old/x", s"$base/final").isSimilar, yes)
+    assertEquals(compareUrls(s"$base/text/a", s"$base/text/b").isSimilar, no)
+    assertEquals(compareUrls(s"$base/home-redirect/1", s"$base/home-redirect/2").isSimilar, no)
+    // Equal stored URLs are similar without any download (the page does not exist).
+    assertEquals(compareUrls(s"$base/missing", s"$base/missing").isSimilar, yes)
+    assertEquals(compareUrls("", s"$base/old/x").isSimilar, undefined)
 
   test("LilacsSasHeuristic accepts different URLs that end at the same final URL"):
+    // Similar but not identical titles: a different URL is a difference and
+    // rejects the pair, so the decision depends on the URL comparison.
     def heuristicResults(original: String, current: String): Seq[CompResult] =
-      Seq("title", "title_serial", "volume_serial", "issue_number", "author", "pages")
+      CompResult("TestComparator", "title", "value", "value", None, None, 0.9, yes) +:
+      Seq("title_serial", "volume_serial", "issue_number", "author", "pages")
         .map(name => CompResult("TestComparator", name, "value", "value", None, None, 1.0, yes)) :+
-        CompResult("UrlsComparator", field, original, current, None, None, 0.0, no) :+
-        CompResult("ExactComparator", "doi_number", "", "", None, None, 0.0, undefined)
+        compareUrls(original, current) :+
+        CompResult("DoiComparator", "doi_number", "", "", None, None, 0.0, undefined)
     def isDuplicated(original: String, current: String): Boolean =
       new LilacsSasHeuristic().isDuplicated(Document(Seq("id" -> "2")), heuristicResults(original, current))
 
