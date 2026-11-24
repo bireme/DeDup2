@@ -130,6 +130,31 @@ class ConfMainSuite extends munit.FunSuite:
     assertEquals(result.isSimilar, SimilarityStatus.yes)
     assertEquals(result.similarity, 1.0)
 
+  test("parseSimilarityConfig accepts DOI comparator"):
+    val config =
+      """{
+        |  "finder": {
+        |    "lucene": {
+        |      "searchField": "title",
+        |      "minSimilarity": 0.8
+        |    }
+        |  },
+        |  "comparators": [
+        |    { "doi": { "fieldName": "doi_number", "occSeparator": ";;" } }
+        |  ]
+        |}""".stripMargin
+
+    val (_, comparators) = ConfMain.parseSimilarityConfig(config)
+    val result = comparators.head.compare(
+      Document(Seq("doi_number" -> "10.1590/xyz;;doi:10.1590/ABC")),
+      Document(Seq("doi_number" -> "https://doi.org/10.1590/abc"))
+    )
+
+    assertEquals(comparators.size, 1)
+    assertEquals(result.name, "DoiComparator")
+    assertEquals(result.fieldName, "doi_number")
+    assertEquals(result.isSimilar, SimilarityStatus.yes)
+
   test("parseSimilarityConfig accepts number comparator"):
     val config =
       """{

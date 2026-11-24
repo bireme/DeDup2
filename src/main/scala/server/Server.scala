@@ -153,6 +153,7 @@ private object DatabaseRegistry:
       case "regex" => "RegexComparator"
       case "authors" => "AuthorsComparator"
       case "urls" => "UrlsComparator"
+      case "doi" => "DoiComparator"
       case other => other
 
 private final class SimilarDocsServlet(configFile: Path) extends HttpServlet:

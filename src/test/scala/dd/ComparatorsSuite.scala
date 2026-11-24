@@ -1,6 +1,6 @@
 package dd
 
-import dd.comparators.{AuthorsComparator, DiceComparator, ExactComparator, JaccardComparator, LevenshteinComparator, LevenshteinJaccardComparator, NGramComparator, NumberComparator, RegexComparator, UrlsComparator}
+import dd.comparators.{AuthorsComparator, DiceComparator, DoiComparator, ExactComparator, JaccardComparator, LevenshteinComparator, LevenshteinJaccardComparator, NGramComparator, NumberComparator, RegexComparator, UrlsComparator}
 import dd.interfaces.{Document, SimilarityStatus}
 
 class ComparatorsSuite extends munit.FunSuite:
@@ -15,6 +15,53 @@ class ComparatorsSuite extends munit.FunSuite:
     assertEquals(result.similarity, 1.0)
     assertEquals(result.originalFieldOther, Some("saopaulo"))
     assertEquals(result.currentFieldOther, Some("saopaulo"))
+
+  test("DoiComparator.isDoi accepts well-formed DOIs, with or without prefix"):
+    assert(DoiComparator.isDoi("10.1590/S0034-89102009000100001"))
+    assert(DoiComparator.isDoi("  doi: 10.1590/s0034-89102009000100001 "))
+    assert(DoiComparator.isDoi("https://doi.org/10.1016/j.jpeds.2019.01.001"))
+    assert(DoiComparator.isDoi("http://dx.doi.org/10.1590/abc"))
+    assert(!DoiComparator.isDoi(""))
+    assert(!DoiComparator.isDoi("value"))
+    assert(!DoiComparator.isDoi("10.159/abc"))
+    assert(!DoiComparator.isDoi("10.1590"))
+    assert(!DoiComparator.isDoi("10.1590/abc def"))
+    assert(!DoiComparator.isDoi("https://example.org/10.1590/abc"))
+
+  test("DoiComparator compares DOIs without prefix and ignoring case"):
+    val comparator = new DoiComparator("doi")
+    def compare(original: String, current: String) =
+      comparator.compare(Document(Seq("doi" -> original)), Document(Seq("doi" -> current)))
+
+    val same = compare("https://doi.org/10.1590/ABC", "doi:10.1590/abc")
+    assertEquals(same.isSimilar, SimilarityStatus.yes)
+    assertEquals(same.similarity, 1.0)
+    assertEquals(same.originalField, "https://doi.org/10.1590/ABC")
+    assertEquals(same.originalFieldOther, Some("10.1590/abc"))
+    assertEquals(same.currentFieldOther, Some("10.1590/abc"))
+
+    val different = compare("10.1590/abc", "10.1590/def")
+    assertEquals(different.isSimilar, SimilarityStatus.no)
+    assertEquals(different.similarity, 0.0)
+
+    // One shared DOI among several occurrences is enough.
+    assertEquals(compare("10.1590/abc //@// 10.1590/def", "10.1590/DEF").isSimilar, SimilarityStatus.yes)
+    assertEquals(compare("10.1590/abc //@// 10.1590/def", "10.1590/xyz").isSimilar, SimilarityStatus.no)
+
+  test("DoiComparator gives undefined when a value is not a DOI"):
+    val comparator = new DoiComparator("doi")
+    def compare(original: String, current: String) =
+      comparator.compare(Document(Seq("doi" -> original)), Document(Seq("doi" -> current)))
+
+    // Equal or different, a malformed DOI is neither a similarity nor a difference.
+    val equalMalformed = compare("value", "value")
+    assertEquals(equalMalformed.isSimilar, SimilarityStatus.undefined)
+    assertEquals(equalMalformed.similarity, 0.0)
+    assertEquals(equalMalformed.originalFieldOther, None)
+    assertEquals(compare("10.1590/abc", "s/n").isSimilar, SimilarityStatus.undefined)
+    // Every occurrence must be a DOI.
+    assertEquals(compare("10.1590/abc //@// not a doi", "10.1590/abc").isSimilar, SimilarityStatus.undefined)
+    assertEquals(compare("", "10.1590/abc").isSimilar, SimilarityStatus.undefined)
 
   test("AuthorsComparator recognizes reordered and normalized author lists"):
     val comparator = new AuthorsComparator("authors")
@@ -175,7 +222,8 @@ class ComparatorsSuite extends munit.FunSuite:
       new JaccardComparator("missing", normalize = false, minSimilarity = 0.0),
       new LevenshteinJaccardComparator("missing", normalize = false, minSimilarity = 0.0),
       new AuthorsComparator("authors"),
-      new UrlsComparator("link")
+      new UrlsComparator("link"),
+      new DoiComparator("missing")
     )
 
     val results = comparators.map(_.compare(left, right))

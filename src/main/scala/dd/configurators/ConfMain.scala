@@ -1,6 +1,6 @@
 package dd.configurators
 
-import dd.comparators.{AuthorsComparator, DiceComparator, ExactComparator, JaccardComparator, LevenshteinComparator, LevenshteinJaccardComparator, NGramComparator, NumberComparator, RegexComparator, UrlsComparator}
+import dd.comparators.{AuthorsComparator, DiceComparator, DoiComparator, ExactComparator, JaccardComparator, LevenshteinComparator, LevenshteinJaccardComparator, NGramComparator, NumberComparator, RegexComparator, UrlsComparator}
 import dd.finders.LuceneDocsFinder
 import dd.heuristics.{DirevHeuristic, LilacsMntHeuristic, LilacsMntamHeuristic, LilacsSasHeuristicStrong, LilacsSasHeuristic, LilacsSasHeuristicWeak2, LilacsSasSourceHeuristic, LisHeuristic}
 import dd.interfaces.{Comparator, DocsFinder, DocsProducer, Heuristics, Reporter}
@@ -712,6 +712,7 @@ object ConfMain:
     else if map.contains("number") then parseNumberComparator(map("number").as[JsObject])
     else if map.contains("authors") then parseAuthorsComparator(map("authors").as[JsObject])
     else if map.contains("urls") then parseUrlsComparator(map("urls").as[JsObject])
+    else if map.contains("doi") then parseDoiComparator(map("doi").as[JsObject])
     else throw new IllegalArgumentException(s"Invalid comparator: $jsonStr")
 
   /**
@@ -848,6 +849,19 @@ object ConfMain:
   private def parseUrlsComparator(json: JsObject): UrlsComparator =
     val map: collection.Map[String, JsValue] = json.value
     new UrlsComparator(
+      fieldName = requiredString(map, "fieldName"),
+      occSeparator = optionalString(map, "occSeparator").getOrElse("//@//")
+    )
+
+  /**
+   * Parses the DOI comparator configuration.
+   *
+   * @param json JSON object containing the selected configuration block
+   * @return configured DOI comparator
+   */
+  private def parseDoiComparator(json: JsObject): DoiComparator =
+    val map: collection.Map[String, JsValue] = json.value
+    new DoiComparator(
       fieldName = requiredString(map, "fieldName"),
       occSeparator = optionalString(map, "occSeparator").getOrElse("//@//")
     )

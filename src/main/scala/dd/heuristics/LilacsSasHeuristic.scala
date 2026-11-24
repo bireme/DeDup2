@@ -26,7 +26,9 @@ class LilacsSasHeuristic extends Heuristics:
    * pages, URL and DOI). The count of empty (undefined) fields leaves URL and
    * DOI out, so it does not depend on whether the configuration has
    * comparators for them; a missing URL or DOI comparator is treated as
-   * undefined.
+   * undefined. A malformed DOI is already undefined in the results (see
+   * {@link dd.comparators.DoiComparator}), so it is neither a similarity nor
+   * a difference.
    *
    *  1. Every field in {@code requiredSimFields} must be similar (currently
    *     none; the journal title is not required).
@@ -65,10 +67,11 @@ class LilacsSasHeuristic extends Heuristics:
 
     if requiredSimFields.exists(fld => getStatus(fld, resultMap) != yes) then false
     else
-      val urlStatus = getStatus(urlField, resultMap)
       val doiStatus = getStatus(doiField, resultMap)
+      lazy val urlStatus = getStatus(urlField, resultMap)
+      lazy val authorStatus = getStatus(doiField, resultMap)
 
-      urlStatus == yes || doiStatus == yes ||
+      doiStatus == yes || (urlStatus == yes && authorStatus == yes) ||
       {
         //val similarFieldCount: Int = resultMap.count((_, status) => status == yes)
         // URL and DOI are left out, so the count does not depend on whether
